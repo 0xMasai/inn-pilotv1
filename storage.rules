@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Nothing in this app currently reads or writes Firebase Storage —
+// `storage` is initialized in firebase.ts but unused. This file exists
+// so that IF Storage is or becomes enabled on the project, it isn't
+// left on whatever default rules the console created it with (which,
+// depending on when the bucket was created, can be wide open). Deny
+// everything until a real feature (e.g. receipt/photo uploads) needs
+// scoped access — at which point this should mirror the hotelId
+// tenant-boundary pattern in firestore.rules, e.g.:
+//
+//   match /hotels/{hotelId}/{allPaths=**} {
+//     allow read, write: if <the same workspace checks as firestore.rules>;
+//   }
+//
+// Deploy with: firebase deploy --only storage
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

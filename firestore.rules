@@ -1,0 +1,347 @@
+rules_version = '2';
+
+// InnPilot security rules — public workspace model.
+//
+// InnPilot has no user accounts. A hotel creates a workspace from the
+// landing page and the browser remembers its hotelId. That makes the
+// hotelId itself the key to a workspace, and these rules are written
+// around that fact:
+//
+//   1. hotelIds are unguessable. A workspace can only be created under a
+//      Firestore-generated 20-character random id — never a readable,
+//      hand-picked one like "hilton".
+//   2. hotelIds cannot be discovered. Listing /hotels and collection-group
+//      queries across hotels are denied, so there is no way to enumerate
+//      other workspaces; a hotel can only be opened by someone who
+//      already holds its id.
+//   3. Data invariants still hold for any client. Stock never goes
+//      negative, statuses stay within their enums, a document's hotelId
+//      must match its path, and the audit and stock-transfer trails stay
+//      append-only.
+//   4. Nothing the app never deletes can be deleted. Every operational
+//      record is created or updated in place; a leaked id can therefore
+//      not be used to wipe a hotel.
+//
+// What these rules cannot do without accounts: tell two holders of the
+// same hotelId apart. Anyone with a workspace's id can work in it, which
+// is the MVP trade-off of login-free onboarding.
+//
+// Operational data lives under hotels/{hotelId}/… (see
+// src/lib/hotelScope.ts); that path segment remains the tenant boundary.
+// `reservations` is written only by the server (Admin SDK, which bypasses
+// these rules), so no client may write it.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function hotelPath(hotelId) {
+      return /databases/$(database)/documents/hotels/$(hotelId);
+    }
+
+    // Uses existsAfter so onboarding can write a hotel and its starting
+    // rooms in one atomic batch; for any later single write it behaves
+    // exactly like exists().
+    function workspaceExistsAfter(hotelId) {
+      return existsAfter(hotelPath(hotelId));
+    }
+
+    function fieldsOk() {
+      return incoming().size() <= 50;
+    }
+
+    // If a document carries hotelId, it must agree with its path.
+    function tenantFieldOk(hotelId) {
+      return !('hotelId' in incoming()) || incoming().hotelId == hotelId;
+    }
+
+    // Every write into a workspace: the hotel must exist, the document
+    // must belong to it, and it must stay a sensible size.
+    function workspaceWrite(hotelId) {
+      return workspaceExistsAfter(hotelId) && fieldsOk() && tenantFieldOk(hotelId);
+    }
+
+    function statusIn(allowed) {
+      return !('status' in incoming()) || incoming().status in allowed;
+    }
+
+    // Inventory can never go negative. The app moves stock inside
+    // transactions; this makes the floor true for any client.
+    function stockOk() {
+      return (!('barStock' in incoming()) || incoming().barStock >= 0)
+        && (!('storeStock' in incoming()) || incoming().storeStock >= 0);
+    }
+
+    function optionalText(field, maxLength) {
+      return !(field in incoming())
+        || (incoming()[field] is string && incoming()[field].size() <= maxLength);
+    }
+
+    // Keep in sync with CURRENCIES in src/lib/hotelProfile.ts.
+    function currencyOk() {
+      return !('currency' in incoming())
+        || incoming().currency in ['UGX', 'KES', 'TZS', 'RWF', 'USD', 'EUR', 'GBP'];
+    }
+
+    function hotelProfileOk() {
+      return (!('name' in incoming())
+          || (incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 120))
+        && currencyOk()
+        && optionalText('location', 120)
+        && optionalText('phone', 40)
+        && optionalText('email', 254)
+        && optionalText('taxId', 60);
+    }
+
+    // How a hotel presents itself to the network AI Concierge (DECISIONS D24).
+    // Keep in sync with src/lib/hotelListing.ts. A hotel can only be listed
+    // for guests once it has a public id to be found by.
+    function listingOk() {
+      return (!('listed' in incoming())
+          || incoming().listed == false
+          || (incoming().listed == true && publicIdFormatOk(incoming().get('publicId', null))))
+        && optionalText('region', 60)
+        && optionalText('country', 60)
+        && optionalText('description', 500)
+        && optionalText('checkInTime', 20)
+        && optionalText('checkOutTime', 20)
+        && optionalText('policies', 1000)
+        && (!('amenities' in incoming())
+          || (incoming().amenities is list && incoming().amenities.size() <= 30));
+    }
+
+    // Guests a room sleeps, when recorded (src/lib/hotelListing.ts MAX_ROOM_CAPACITY).
+    function roomCapacityOk() {
+      return !('capacity' in incoming())
+        || incoming().capacity == null
+        || (incoming().capacity is int && incoming().capacity >= 1 && incoming().capacity <= 20);
+    }
+
+    function optionalBool(field) {
+      return !(field in incoming()) || incoming()[field] is bool;
+    }
+
+    // Keep in sync with CHANNELS, HANDLERS, CONVERSATION_BOOKING_STATES and
+    // HOTEL_SELECTIONS in src/lib/conversations.ts.
+    function conversationOk() {
+      return incoming().channel in ['web', 'whatsapp', 'instagram', 'email']
+        && incoming().handledBy in ['ai', 'human']
+        && (!('bookingStatus' in incoming()) || incoming().bookingStatus in ['none', 'quoted', 'booked'])
+        && (!('selection' in incoming()) || incoming().selection in ['none', 'this', 'other'])
+        && optionalText('selectedHotelName', 120)
+        && optionalBool('bookedElsewhere')
+        && optionalBool('closed')
+        && (!('guestName' in incoming()) || (incoming().guestName is string && incoming().guestName.size() <= 120))
+        && leadOk()
+        && followUpOk();
+    }
+
+    // The three moments a follow-up is worked out from (D21): when the guest
+    // last wrote, when they were last chased, and how long "Not now" lasts.
+    // Each is a time or nothing; none of them is a claim about a guest.
+    function momentOk(field) {
+      return !(field in incoming())
+        || incoming()[field] == null
+        || incoming()[field] is timestamp;
+    }
+
+    function followUpOk() {
+      return momentOk('lastGuestAt') && momentOk('followUpSentAt') && momentOk('followUpSnoozedUntil');
+    }
+
+    // The lead score, when set: one of the four scores and its reasons.
+    // Keep in sync with LEAD_SCORES and MAX_LEAD_REASONS (src/lib/leadScoring.ts).
+    function leadOk() {
+      return !('lead' in incoming())
+        || incoming().lead == null
+        || (incoming().lead.keys().hasOnly(['score', 'reasons'])
+          && incoming().lead.score in ['hot', 'warm', 'cold', 'vip']
+          && incoming().lead.reasons is list
+          && incoming().lead.reasons.size() <= 8);
+    }
+
+    // ---- Public hotel identity (see src/lib/publicHotel.ts) ----
+    // Keep in sync with PUBLIC_HOTEL_ID_PATTERN.
+    function publicIdFormatOk(publicId) {
+      return publicId is string
+        && publicId.size() <= 64
+        && publicId.matches('^[a-z0-9]+(-[a-z0-9]+)+$');
+    }
+
+    function publicHotelPath(publicId) {
+      return /databases/$(database)/documents/publicHotels/$(publicId);
+    }
+
+    // The hotel's incoming publicId is backed by a mapping that points back
+    // at this same hotel, after the write.
+    function publicIdBoundOk(hotelId) {
+      return publicIdFormatOk(incoming().publicId)
+        && existsAfter(publicHotelPath(incoming().publicId))
+        && getAfter(publicHotelPath(incoming().publicId)).data.hotelId == hotelId;
+    }
+
+    match /hotels/{hotelId} {
+      allow get: if true;
+      // No enumeration: a workspace is only reachable by its id.
+      allow list: if false;
+
+      allow create: if hotelId.matches('^[A-Za-z0-9]{20}$')
+        && incoming().keys().hasOnly(['name', 'location', 'currency', 'phone', 'email', 'taxId', 'subscription', 'createdAt', 'publicId'])
+        && incoming().keys().hasAll(['name', 'currency', 'subscription', 'createdAt'])
+        && hotelProfileOk()
+        // Every workspace starts on the trial; nobody can self-assign a plan.
+        && incoming().subscription == {'plan': 'trial', 'status': 'active'}
+        && incoming().createdAt == request.time
+        && (!('publicId' in incoming()) || publicIdBoundOk(hotelId));
+
+      // How the hotel presents itself, and nothing else. `subscription`
+      // in particular is platform-owned. `publicId` can be added once (for a
+      // workspace created before it existed) and never changed or removed:
+      // guests' links depend on it. The concierge listing fields (D24) are the
+      // hotel's own to edit.
+      allow update: if incoming().diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'location', 'currency', 'phone', 'email', 'taxId', 'publicId',
+                    'listed', 'region', 'country', 'description', 'amenities',
+                    'checkInTime', 'checkOutTime', 'policies'])
+        && hotelProfileOk()
+        && listingOk()
+        && (!incoming().diff(resource.data).affectedKeys().hasAny(['publicId'])
+          || (!('publicId' in resource.data) && publicIdBoundOk(hotelId)));
+
+      allow delete: if false;
+
+      match /rooms/{docId} {
+        allow read: if true;
+        allow create, update: if workspaceWrite(hotelId)
+          && statusIn(['Available', 'Occupied', 'Cleaning', 'Maintenance', 'Out of Service'])
+          && roomCapacityOk();
+        allow delete: if false;
+      }
+
+      // Legacy misspelling kept verbatim: the Accommodation module's bookings.
+      match /accomodation/{docId} {
+        allow read: if true;
+        allow create, update: if workspaceWrite(hotelId)
+          && statusIn(['Confirmed', 'Checked In', 'Checked Out', 'Cancelled', 'No Show']);
+        allow delete: if false;
+      }
+
+      // Server-written only (Admin SDK). Readable so availability sees them.
+      match /reservations/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /restaurant/{docId} {
+        allow read: if true;
+        allow create, update: if workspaceWrite(hotelId)
+          && statusIn(['Open', 'Served', 'Paid', 'Cancelled']);
+        allow delete: if false;
+      }
+
+      // ---- Bar ----
+      // Products are archived, never deleted: past sales reference them.
+      match /barProducts/{docId} {
+        allow read: if true;
+        allow create, update: if workspaceWrite(hotelId) && stockOk();
+        allow delete: if false;
+      }
+
+      // Sales are the revenue record: written once, never altered.
+      match /barSales/{docId} {
+        allow read: if true;
+        allow create: if workspaceWrite(hotelId);
+        allow update, delete: if false;
+      }
+
+      // The stock-movement trail: append-only by design.
+      match /barTransfers/{docId} {
+        allow read: if true;
+        allow create: if workspaceWrite(hotelId);
+        allow update, delete: if false;
+      }
+
+      // ---- Parking ----
+      match /parking/{docId} {
+        allow read: if true;
+        allow create, update: if workspaceWrite(hotelId)
+          && statusIn(['Parked', 'Released']);
+        allow delete: if false;
+      }
+
+      // Expenses are recorded, not edited.
+      match /expenses/{docId} {
+        allow read: if true;
+        allow create: if workspaceWrite(hotelId);
+        allow update, delete: if false;
+      }
+
+      // ---- Guest conversations (the inbox; see src/lib/conversations.ts) ----
+      // Web threads are written by the server; the workspace can add sample
+      // threads for the MOCKED channels, take a thread over and reply.
+      match /conversations/{conversationId} {
+        allow read: if true;
+        allow create: if workspaceWrite(hotelId) && conversationOk();
+        // The channel a thread arrived on never changes.
+        allow update: if workspaceWrite(hotelId) && conversationOk()
+          && incoming().channel == resource.data.channel;
+        allow delete: if false;
+
+        // The thread itself: written once, never edited or removed.
+        match /messages/{messageId} {
+          allow read: if true;
+          allow create: if workspaceExistsAfter(hotelId)
+            && fieldsOk()
+            && tenantFieldOk(hotelId)
+            && existsAfter(/databases/$(database)/documents/hotels/$(hotelId)/conversations/$(conversationId))
+            && incoming().keys().hasAll(['role', 'text', 'at'])
+            && incoming().role in ['guest', 'ai', 'staff']
+            && incoming().text is string
+            && incoming().text.size() > 0
+            && incoming().text.size() <= 4000;
+          allow update, delete: if false;
+        }
+      }
+
+      match /auditLog/{docId} {
+        allow read: if true;
+        allow create: if workspaceWrite(hotelId);
+        allow update, delete: if false;
+      }
+    }
+
+    // publicHotels/{publicId} → { hotelId }: how the server turns a guest's
+    // link into a hotel. Never readable by a client — it would hand out the
+    // workspace key — and written once, together with the hotel's own
+    // publicId, which must point back at it.
+    match /publicHotels/{publicId} {
+      allow read: if false;
+      allow create: if publicIdFormatOk(publicId)
+        && incoming().keys().hasOnly(['hotelId', 'createdAt'])
+        && incoming().keys().hasAll(['hotelId', 'createdAt'])
+        && incoming().hotelId is string
+        && incoming().hotelId.matches('^[A-Za-z0-9]{20}$')
+        && incoming().createdAt == request.time
+        && existsAfter(hotelPath(incoming().hotelId))
+        && getAfter(hotelPath(incoming().hotelId)).data.get('publicId', null) == publicId;
+      allow update, delete: if false;
+    }
+
+    // The network concierge's canonical guest threads (DECISIONS D29): the
+    // pending booking a guest must confirm and the internal ids of the hotels
+    // involved. Server-only (Admin SDK). Each hotel sees its own mirror under
+    // hotels/{hotelId}/conversations instead.
+    match /conciergeConversations/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Everything unmatched — including the retired users collection and
+    // any collection-group query — is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

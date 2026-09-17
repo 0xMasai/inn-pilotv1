@@ -1,0 +1,757 @@
+/* ============================================================
+   Hotel Management — Enterprise Design System
+   Fonts first (before Tailwind import, per CSS @import rules)
+   ============================================================ */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap");
+@import "tailwindcss";
+
+/* ------------------------------------------------------------
+   1. DESIGN TOKENS
+   ------------------------------------------------------------ */
+:root {
+  /* Brand / primary — InnPilot teal/cyan, sourced from the logo mark */
+  --primary: #0e93a3;
+  --primary-hover: #0c7c8a;
+  --primary-active: #0a6672;
+  --primary-soft: #ecfeff;
+  --primary-border: #a5e9ef;
+
+  /* InnPilot brand accent (the brighter cyan edge of the logo gradient) */
+  --brand-cyan: #2dd4c8;
+  --brand-teal: #0e93a3;
+  --brand-navy: #0b1220;
+
+  /* Dark navigation rail — matches the logo's navy background */
+  --rail: #0b1220;
+  --rail-2: #111a30;
+  --rail-border: rgba(255, 255, 255, 0.08);
+  --rail-text: #c7d0e0;
+  --rail-text-muted: #8b97ad;
+  --rail-active: rgba(45, 212, 200, 0.16);
+
+  /* Surfaces & backgrounds */
+  --app-bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --surface-hover: #f8fafc;
+
+  /* Borders */
+  --border: #e5e8ee;
+  --border-strong: #d5dae3;
+
+  /* Text hierarchy */
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #8a95a8;
+  --text-inverse: #ffffff;
+
+  /* Status */
+  --success: #16a34a;
+  --success-soft: #ecfdf3;
+  --success-text: #15803d;
+  --success-border: #bbf7d0;
+
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --warning-text: #b45309;
+  --warning-border: #fde68a;
+
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --danger-text: #b91c1c;
+  --danger-border: #fecaca;
+
+  --info: #2563eb;
+  --info-soft: #eff6ff;
+  --info-text: #1d4ed8;
+  --info-border: #bfdbfe;
+
+  --neutral-soft: #f1f5f9;
+  --neutral-text: #475569;
+  --neutral-border: #e2e8f0;
+
+  /* Category accents */
+  --accent-orange: #ea580c;
+  --accent-purple: #7c3aed;
+  --accent-teal: #0d9488;
+
+  /* Radius — cards sit at 12–16px so the whole app reads as one product */
+  --r-sm: 8px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --r-full: 9999px;
+
+  /* Shadows (controlled elevation) */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Poppins", var(--font-sans);
+
+  /* Transitions */
+  --t-fast: 120ms ease;
+  --t: 180ms ease;
+
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------
+   2. BASE RESET (in @layer base so Tailwind utilities win)
+   ------------------------------------------------------------ */
+@layer base {
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--app-bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root { min-height: 100vh; }
+
+  h1, h2, h3, h4, h5 {
+    margin: 0;
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { color: var(--primary-hover); }
+
+  /* Neutralize default button chrome; utilities/components drive appearance */
+  button {
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: inherit;
+  }
+  button:disabled { cursor: not-allowed; }
+
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd3e0;
+    border-radius: var(--r-full);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #b0bacb; background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* ------------------------------------------------------------
+   3. COMPONENT CLASSES (in @layer components; utilities still win)
+   ------------------------------------------------------------ */
+@layer components {
+  .font-poppins { font-family: var(--font-display); }
+
+  /* Surfaces */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+  }
+  .card-pad { padding: 20px; }
+  .section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .muted { color: var(--text-muted); }
+
+  /* Page header */
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .page-subtitle {
+    margin-top: 4px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    transition: background var(--t), border-color var(--t), color var(--t), box-shadow var(--t), transform var(--t-fast);
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  .btn:active { transform: translateY(0.5px); }
+  .btn:disabled { opacity: 0.6; }
+  .btn-sm { padding: 6px 12px; font-size: 0.8125rem; }
+
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow-xs); }
+  .btn-primary:hover { background: var(--primary-hover); }
+
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: var(--surface-muted); }
+
+  .btn-ghost { background: transparent; color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--surface-muted); color: var(--text); }
+
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: var(--danger-text); }
+
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { background: var(--success-text); }
+
+  /* Inputs */
+  .field-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .field-label .req { color: var(--danger); margin-left: 2px; }
+
+  .input,
+  .select,
+  .textarea {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.875rem;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    transition: border-color var(--t), box-shadow var(--t), background var(--t);
+    outline: none;
+  }
+  .input::placeholder,
+  .textarea::placeholder { color: var(--text-muted); }
+  .input:focus,
+  .select:focus,
+  .textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .textarea { resize: vertical; min-height: 96px; }
+  .select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a95a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 34px;
+  }
+
+  .search-wrap { position: relative; display: flex; align-items: center; }
+  .search-wrap > svg { position: absolute; left: 12px; color: var(--text-muted); pointer-events: none; }
+  .search-wrap .input { padding-left: 36px; }
+
+  /* Badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    border-radius: var(--r-full);
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+  }
+  .badge-success { background: var(--success-soft); color: var(--success-text); border-color: var(--success-border); }
+  .badge-warning { background: var(--warning-soft); color: var(--warning-text); border-color: var(--warning-border); }
+  .badge-danger  { background: var(--danger-soft);  color: var(--danger-text);  border-color: var(--danger-border); }
+  .badge-info    { background: var(--info-soft);    color: var(--info-text);    border-color: var(--info-border); }
+  .badge-neutral { background: var(--neutral-soft); color: var(--neutral-text); border-color: var(--neutral-border); }
+  .badge-plain::before { display: none; }
+
+  /* Stat / KPI cards */
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 124px;
+    transition: box-shadow var(--t), border-color var(--t), transform var(--t);
+  }
+  .stat-card:hover { box-shadow: var(--shadow-sm); border-color: var(--border-strong); }
+  .stat-top { display: flex; align-items: center; justify-content: space-between; }
+  .stat-label { font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary); }
+  .stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text);
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    margin-top: auto;
+  }
+  @media (min-width: 1280px) { .stat-value { font-size: 1.75rem; } }
+  .stat-icon {
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--r-md);
+    background: var(--primary-soft);
+    color: var(--primary);
+    flex: none;
+  }
+  .stat-icon.is-success { background: var(--success-soft); color: var(--success); }
+  .stat-icon.is-danger  { background: var(--danger-soft);  color: var(--danger); }
+  .stat-icon.is-warning { background: var(--warning-soft); color: var(--warning); }
+  .stat-icon.is-purple  { background: #f3e8ff; color: var(--accent-purple); }
+  .stat-icon.is-orange  { background: #fff2e8; color: var(--accent-orange); }
+
+  /* Data tables */
+  .table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--border); }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .data-table thead th {
+    text-align: left;
+    padding: 11px 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--surface-muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .data-table tbody td {
+    padding: 12px 16px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .data-table tbody tr:last-child td { border-bottom: none; }
+  .data-table tbody tr { transition: background var(--t-fast); }
+  .data-table tbody tr:hover { background: var(--surface-hover); }
+
+  /* Filter bar */
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xs);
+    padding: 16px 18px;
+  }
+
+  /* Empty & loading states */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 48px 24px;
+    gap: 6px;
+  }
+  .empty-state .empty-icon {
+    width: 52px; height: 52px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--r-full);
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .empty-title { font-weight: 600; color: var(--text); }
+  .empty-desc { font-size: 0.875rem; color: var(--text-secondary); max-width: 340px; }
+
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-muted);
+    border-radius: var(--r-sm);
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute; inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+    animation: skeleton-shimmer 1.4s infinite;
+  }
+
+  /* Modals */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    z-index: 50;
+  }
+  .modal-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .modal-title { font-size: 1.125rem; font-weight: 600; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--r-md);
+    color: var(--text-secondary);
+    transition: background var(--t), color var(--t);
+  }
+  .icon-btn:hover { background: var(--surface-muted); color: var(--text); }
+
+  /* Modal form groups */
+  .form-section { padding: 4px 0; }
+  .form-section + .form-section { margin-top: 4px; }
+  .form-section-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+
+  /* Segmented control — date ranges and tab strips.
+     Scrolls horizontally on a phone rather than wrapping into a ragged
+     block, so the row keeps one predictable height at every width. */
+  .segmented {
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+  .segmented::-webkit-scrollbar { display: none; }
+  .segmented-item {
+    padding: 6px 13px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-radius: var(--r-sm);
+    white-space: nowrap;
+    transition: background var(--t), color var(--t);
+  }
+  .segmented-item:hover { background: var(--surface-muted); color: var(--text); }
+  .segmented-item.is-active {
+    background: var(--primary);
+    color: #fff;
+  }
+  .segmented-item.is-active:hover { background: var(--primary-hover); color: #fff; }
+
+  /* Sub-navigation inside a module (Bar: Overview / Products / Sales / Transfers) */
+  .subnav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .subnav::-webkit-scrollbar { display: none; }
+  .subnav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 11px 14px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color var(--t), border-color var(--t);
+  }
+  .subnav-item:hover { color: var(--text); }
+  .subnav-item.is-active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+  }
+
+  /* POS product tile — the bar's tap-to-add grid */
+  .pos-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    text-align: left;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    transition: border-color var(--t), box-shadow var(--t), transform var(--t-fast);
+  }
+  .pos-tile:hover:not(:disabled) {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-sm);
+  }
+  .pos-tile:active:not(:disabled) { transform: translateY(1px); }
+  .pos-tile:disabled { opacity: 0.55; }
+  .pos-tile.is-selected {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+  }
+
+  /* Compact quantity stepper used in the cart */
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+  }
+  .stepper button {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: background var(--t);
+  }
+  .stepper button:hover:not(:disabled) { background: var(--surface-muted); color: var(--text); }
+  .stepper button:disabled { opacity: 0.4; }
+  .stepper input {
+    width: 44px;
+    height: 28px;
+    text-align: center;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: none;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    outline: none;
+    color: var(--text);
+    -moz-appearance: textfield;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  /* Definition row — label left, value right. Summary panels everywhere. */
+  .kv {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 0;
+    font-size: 0.875rem;
+  }
+  .kv + .kv { border-top: 1px dashed var(--border); }
+  .kv-label { color: var(--text-secondary); }
+  .kv-value { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .kv-total { padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--border-strong) !important; }
+  .kv-total .kv-label { font-weight: 600; color: var(--text); }
+  .kv-total .kv-value { font-size: 1.125rem; font-family: var(--font-display); }
+
+  /* Numeric table cells line up only if their digits do */
+  .num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  .data-table th.num, .data-table td.num { text-align: right; }
+
+  /* Small select — for tight cells like the room-status picker.
+     Overrides .select's padding wholesale rather than just its height:
+     setting height alone leaves the 10px vertical padding in place, which
+     is what made the text sit off-centre and clipped the chevron. */
+  .select-sm {
+    height: 34px;
+    padding: 0 30px 0 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-position: right 8px center;
+    background-size: 14px;
+  }
+
+  /* Room card — one tile per room in the inventory grid. */
+  .room-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 14px 14px 17px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    transition: border-color var(--t), box-shadow var(--t);
+  }
+  .room-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+  /* Status reads as a colour stripe, so it survives any card width. */
+  .room-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 3px;
+    background: var(--room-accent, var(--border-strong));
+  }
+  .room-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .room-card-number {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* A dot plus a label that is allowed to truncate. The old markup used a
+     .badge here, whose `white-space: nowrap` made "Out of Service"
+     overflow the tile and collide with the room number. */
+  .room-card-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .room-card-status i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--room-accent, var(--text-muted));
+    flex: none;
+  }
+  .room-card-status span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .room-card-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .room-card .select-sm { margin-top: auto; }
+
+  /* Front-desk row — one arrival or departure awaiting action. */
+  .desk-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    transition: border-color var(--t), background var(--t);
+  }
+  .desk-row:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+  .desk-row.is-overdue {
+    border-color: var(--danger-border);
+    background: var(--danger-soft);
+  }
+  /* The whole label is the hit target for opening the reservation, so it
+     needs to be a block that can actually truncate inside the flex row. */
+  .desk-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+    text-align: left;
+  }
+  .desk-row-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desk-row-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ------------------------------------------------------------
+   4. Keyframes & chart tuning (top level)
+   ------------------------------------------------------------ */
+@keyframes skeleton-shimmer { 100% { transform: translateX(100%); } }
+
+.recharts-cartesian-axis-tick text { fill: var(--text-muted); font-size: 12px; }
+.recharts-default-tooltip {
+  border-radius: var(--r-md) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-md) !important;
+  font-size: 0.8125rem !important;
+}

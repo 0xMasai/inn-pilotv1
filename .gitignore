@@ -1,0 +1,72 @@
+# --- Dependencies ------------------------------------------------------------
+node_modules
+
+# --- Secrets: never commit these --------------------------------------------
+# Local environment files. Only the placeholder template is tracked.
+.env
+.env.*
+!.env.example
+
+# Firebase Admin / Google service-account keys (full Firestore access).
+serviceAccountKey.json
+*serviceAccountKey*.json
+*service-account*.json
+*service_account*.json
+*-firebase-adminsdk-*.json
+*credentials*.json
+
+# Private keys and code-signing certificates (see SIGNING.md).
+*.pem
+*.key
+*.p8
+*.pfx
+*.p12
+id_rsa*
+id_ed25519*
+
+# --- Generated build output ---------------------------------------------------
+dist
+dist-electron
+dist-ssr
+release
+build/*
+!build/icon.png
+coverage
+*.tsbuildinfo
+tsc_output.txt
+*.local
+
+# Vercel local build/dev output
+.vercel
+
+# --- Firebase emulator data and logs -----------------------------------------
+.firebase
+emulator-data
+firebase-export-*
+firestore-debug.log
+firebase-debug.log
+database-debug.log
+pubsub-debug.log
+ui-debug.log
+
+# --- Logs --------------------------------------------------------------------
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- OS and editor files -----------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

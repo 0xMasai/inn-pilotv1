@@ -152,6 +152,17 @@ Failure handling (automated, scripted Gemini + emulator): no hotels in destinati
 | `npm run verify:vercel` (emulator) | ✅ 9/9 — all 5 functions bundle and answer; health reports `provider=groq model=openai/gpt-oss-120b`, no key in any bundle or response |
 | Vercel deployment, `firestore.rules` deploy, production Firestore writes | ⛔ GATED — not done; needs explicit approval and account access |
 
+## Production-readiness audit (2026-09-17)
+
+| Check | Result |
+| --- | --- |
+| `npm test` (emulator running) | ✅ 21 files, 498 tests |
+| `npm run lint` · `npm run build` | ✅ clean |
+| `npm run verify:release` | ✅ 11/11 |
+| `npm run verify:vercel` (emulator) | ✅ 9/9 — health `{"status":"ok","provider":"groq","configured":true}` |
+| Credentials | ✅ `serviceAccountKey.json` moved outside the project; `.env`/`.env.*` and key-file patterns git-ignored; client calls only relative `/api/*` paths |
+| Firebase rules deploy, Vercel deploy | ⛔ GATED — not done |
+
 ## Demo data (D28)
 
 | Item | Status | Evidence |
@@ -170,7 +181,7 @@ Failure handling (automated, scripted Gemini + emulator): no hotels in destinati
 
 ## Known issues
 
-1. `serviceAccountKey.json` (production, `hotel-management-c183c`) sits in the project root. It is git-ignored, but it is a full-access key on disk; move it out of the project or revoke it when no longer needed.
+1. `serviceAccountKey.json` (production, `hotel-management-c183c`) was moved out of the project on 2026-09-17 (it was never committed). It is still a full-access key on the machine; revoke it when no longer needed.
 2. A network conversation that never reaches search results (e.g. no hotel in the destination) is recorded canonically but appears in no hotel's inbox (D29).
 3. A staff reply at one hotel is not copied into other hotels' mirrors of the same guest (D29).
 4. Confirmation detection and lead scoring are English-only.
@@ -185,4 +196,4 @@ Failure handling (automated, scripted Gemini + emulator): no hotels in destinati
 1. Add `GROQ_API_KEY` (and optionally `AI_PROVIDER=groq`, `GROQ_MODEL=openai/gpt-oss-120b`) to the Vercel project's environment variables.
 2. Decide the Firebase project for the demo; then deploy `firestore.rules` and run `npm run seed:k-hotels -- --confirm-real-project=<id>` (or list real hotels from Settings).
 3. Vercel access to deploy (`DEPLOYMENT.md`).
-4. Move `serviceAccountKey.json` out of the project directory.
+4. ~~Move `serviceAccountKey.json` out of the project directory.~~ Done 2026-09-17.

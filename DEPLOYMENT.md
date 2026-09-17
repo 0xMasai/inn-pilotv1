@@ -1,7 +1,7 @@
 # InnPilot: deploying the challenge build
 
-**Nothing in this file has been run.** There is no remote, no Vercel project
-and no deployment. Every step below is written to be followed by a person
+**Nothing in this file has been run.** The source is on GitHub
+(`0xMasai/inn-pilotv1`), but there is no Vercel project and no deployment. Every step below is written to be followed by a person
 holding the accounts, and everything that touches a live project is marked
 **GATED** — it needs an explicit decision, because it is hard to undo.
 

@@ -100,6 +100,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setStatus("ready");
   }, []);
 
+  const leaveWorkspace = useCallback(() => {
+    storeHotelId(null);
+    verified.current = null;
+    setCandidate(null);
+    setStatus("none");
+  }, []);
+
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   return (
@@ -108,6 +115,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         hotelId: status === "ready" ? candidate : null,
         status,
         enterWorkspace,
+        leaveWorkspace,
         retry,
       }}
     >

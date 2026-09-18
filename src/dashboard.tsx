@@ -9,7 +9,10 @@ import type { ReactNode } from "react";
 import {
   Beer,
   BedDouble,
+  Check,
   CircleParking,
+  Copy,
+  DoorOpen,
   LayoutDashboard,
   Menu,
   Receipt,
@@ -22,8 +25,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import Tippy from "@tippyjs/react";
 import "tippy.js/dist/tippy.css";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
+import { Modal, useToast } from "./components/ui";
 import { useWorkspace } from "./workspace/workspaceContext";
 import { useHotelProfile } from "./lib/hotelProfile";
 import innpilotMark from "./assets/brand/innpilot-mark.png";
@@ -77,12 +81,14 @@ function SidebarContent({
   hotelLocation,
   onNavigate,
   onToggleCollapse,
+  onLeave,
 }: {
   collapsed: boolean;
   hotelName: string;
   hotelLocation: string;
   onNavigate?: () => void;
   onToggleCollapse?: () => void;
+  onLeave: () => void;
 }) {
   return (
     <>
@@ -203,8 +209,92 @@ function SidebarContent({
             </span>
           )}
         </NavLink>
+        <Tippy content="Leave workspace" placement="right" disabled={!collapsed}>
+          <button
+            type="button"
+            onClick={onLeave}
+            className={`mt-1 flex items-center w-full px-3 py-2 rounded-lg hover:bg-white/5 hover:text-white transition text-[13.5px] ${
+              collapsed ? "justify-center" : "gap-3"
+            }`}
+            style={{ color: "var(--rail-text-muted)" }}
+            aria-label="Leave workspace"
+          >
+            <DoorOpen size={17} />
+            {!collapsed && <span>Leave workspace</span>}
+          </button>
+        </Tippy>
       </div>
     </>
+  );
+}
+
+/**
+ * There are no accounts, so leaving only makes this browser forget the
+ * hotel. The workspace ID is the one way back in: show it before it goes.
+ */
+function LeaveWorkspaceDialog({
+  open,
+  hotelId,
+  onCancel,
+  onLeave,
+}: {
+  open: boolean;
+  hotelId: string | null;
+  onCancel: () => void;
+  onLeave: () => void;
+}) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    if (!hotelId) return;
+    try {
+      await navigator.clipboard.writeText(hotelId);
+      setCopied(true);
+      toast.success("Workspace ID copied");
+    } catch {
+      toast.error("Couldn't copy automatically. Select the ID and copy it instead.");
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title="Leave this workspace?"
+      width="sm"
+      footer={
+        <>
+          <button className="btn btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={onLeave}>
+            Leave workspace
+          </button>
+        </>
+      }
+    >
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        This browser will forget your hotel. Nothing is deleted. To open it again, paste this
+        workspace ID on the staff page:
+      </p>
+      <div className="flex items-center gap-2 mt-4">
+        <code
+          className="flex-1 min-w-0 truncate text-xs rounded-md px-2.5 py-2 select-all"
+          style={{ background: "var(--surface-muted)", color: "var(--text)" }}
+        >
+          {hotelId ?? "—"}
+        </code>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm shrink-0"
+          onClick={copy}
+          aria-label="Copy workspace ID"
+        >
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -214,8 +304,10 @@ const COLLAPSED = 76;
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const location = useLocation();
-  const { hotelId } = useWorkspace();
+  const navigate = useNavigate();
+  const { hotelId, leaveWorkspace } = useWorkspace();
   const { profile } = useHotelProfile(hotelId);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -227,6 +319,12 @@ export default function AppShell() {
   }, [location.pathname]);
 
   const meta = metaFor(location.pathname);
+
+  const confirmLeave = () => {
+    setLeaving(false);
+    leaveWorkspace();
+    navigate("/staff", { replace: true });
+  };
 
   return (
     <div
@@ -245,6 +343,7 @@ export default function AppShell() {
           hotelName={profile.name}
           hotelLocation={profile.location}
           onToggleCollapse={() => setCollapsed((c) => !c)}
+          onLeave={() => setLeaving(true)}
         />
       </motion.aside>
 
@@ -280,6 +379,10 @@ export default function AppShell() {
                 hotelName={profile.name}
                 hotelLocation={profile.location}
                 onNavigate={() => setMobileOpen(false)}
+                onLeave={() => {
+                  setMobileOpen(false);
+                  setLeaving(true);
+                }}
               />
             </motion.aside>
           </>
@@ -329,6 +432,13 @@ export default function AppShell() {
           </footer>
         </main>
       </div>
+
+      <LeaveWorkspaceDialog
+        open={leaving}
+        hotelId={hotelId}
+        onCancel={() => setLeaving(false)}
+        onLeave={confirmLeave}
+      />
     </div>
   );
 }

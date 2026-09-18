@@ -28,6 +28,11 @@ export interface WorkspaceState {
   status: WorkspaceStatus;
   /** Make a just-created hotel the active workspace. */
   enterWorkspace: (hotelId: string) => void;
+  /**
+   * Forget the active workspace in this browser. Nothing is deleted: the
+   * hotel opens again from /staff with its workspace ID.
+   */
+  leaveWorkspace: () => void;
   /** Re-check a stored workspace after an `unavailable` result. */
   retry: () => void;
 }
@@ -36,6 +41,7 @@ export const WorkspaceContext = createContext<WorkspaceState>({
   hotelId: null,
   status: "loading",
   enterWorkspace: () => {},
+  leaveWorkspace: () => {},
   retry: () => {},
 });
 

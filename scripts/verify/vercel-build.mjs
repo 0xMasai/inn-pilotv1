@@ -15,8 +15,11 @@
  * runs the output — not the sources — behind a plain Node server, and makes
  * real requests to it. What it proves: every import resolves on plain Node,
  * each function has the default export the platform looks for, and the
- * routes answer. What it cannot prove: anything about Vercel's own
- * infrastructure. That needs a real deployment (DEPLOYMENT.md).
+ * routes answer. It also type-checks the functions the way Vercel does:
+ * against the root tsconfig.json, not tsconfig.server.json, so an option
+ * that only the server project sets (strict, say) does not count. What it
+ * cannot prove: anything about Vercel's own infrastructure. That needs a
+ * real deployment (DEPLOYMENT.md).
  *
  *   node scripts/verify/vercel-build.mjs
  *
@@ -26,9 +29,10 @@
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_PROJECT_ID=innpilot-ui-verify \
  *     node scripts/verify/vercel-build.mjs
  */
-import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import http from "node:http";
 import { build } from "esbuild";
 import { config } from "dotenv";
@@ -65,6 +69,32 @@ const routeOf = (file) => `/${relative(ROOT, file).replace(/\\/g, "/").replace(/
 let server;
 try {
   rmSync(OUT, { recursive: true, force: true });
+
+  /* ---------------- Type-check, the way the platform does ---------------- */
+  // Vercel checks each function against the nearest tsconfig.json (the
+  // root one) and fills in its own target and module settings. `tsc -b`
+  // never sees that combination, so a build that passes locally can still
+  // fail there, as it did when the root file had no "strict".
+  const typecheckDir = join(OUT, "typecheck");
+  mkdirSync(typecheckDir, { recursive: true });
+  writeFileSync(
+    join(typecheckDir, "tsconfig.json"),
+    JSON.stringify({
+      extends: relative(typecheckDir, join(ROOT, "tsconfig.json")).replace(/\\/g, "/"),
+      files: null,
+      references: [],
+      compilerOptions: { noEmit: true, target: "ES2022", module: "ESNext", moduleResolution: "bundler", esModuleInterop: true, skipLibCheck: true },
+      include: ["api", "server"].map((dir) => relative(typecheckDir, join(ROOT, dir)).replace(/\\/g, "/")),
+    })
+  );
+  const tsc = spawnSync(process.execPath, [join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", typecheckDir], { encoding: "utf8" });
+  const typeErrors = tsc.stdout.split("\n").filter((line) => /error TS\d+/.test(line));
+  check(
+    "every function type-checks against the root tsconfig.json, as Vercel's build does",
+    tsc.status === 0,
+    typeErrors.slice(0, 5).join("; ") || tsc.stderr.trim().slice(0, 300)
+  );
+  rmSync(typecheckDir, { recursive: true, force: true });
 
   /* ---------------- Build, the way the platform does ---------------- */
   // One .js per .ts, imports left exactly as written: no bundling, so an

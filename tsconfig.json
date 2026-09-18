@@ -1,13 +1,9 @@
 {
   /* Solution file: `tsc -b` builds the three referenced projects, and this
-     file compiles nothing itself ("files": []). But Vercel type-checks each
-     api/ function against the nearest tsconfig.json, which is this one, and
-     uses only these compilerOptions — not tsconfig.server.json's. Without
-     "strict", `if (!x.ok)` no longer narrows the { ok: true } | { ok: false }
-     results the server returns, and the deployment fails to build. */
-  "compilerOptions": {
-    "strict": true
-  },
+     file compiles nothing itself ("files": []). Vercel's own type-check of
+     api/ does not take "strict" from here (setting it changed nothing in the
+     deployment logs), so server code must also type-check with strict off.
+     `npm run verify:vercel` checks exactly that. */
   "files": [],
   "references": [
     {

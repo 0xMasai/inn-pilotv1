@@ -124,7 +124,7 @@ export async function bookRoom(scope: HotelScope, input: BookRoomInput): Promise
     if (!room) return notBooked("room_not_found", `Room ${roomNumber} doesn't exist.`);
 
     const bookability = checkRoomBookable(room, checkIn, checkOut, stays);
-    if (!bookability.bookable) {
+    if (bookability.bookable === false) {
       return bookability.reason === "room-out-of-service"
         ? notBooked("room_unavailable", "That room can't be booked right now.")
         : notBooked("dates_taken", "That room was just booked for those dates.");
@@ -233,13 +233,13 @@ export const createReservationTool: ConciergeTool = {
     }
 
     const hotel = await readHotelArg(context, args);
-    if (!hotel.ok) return notBooked("unknown_hotel", String(hotel.result.message));
+    if (hotel.ok === false) return notBooked("unknown_hotel", String(hotel.result.message));
     const { scope } = hotel;
 
     const parsed = readStayDates(args, context.now);
-    if (!parsed.ok) return notBooked("invalid_dates", parsed.message);
+    if (parsed.ok === false) return notBooked("invalid_dates", parsed.message);
     const guest = readGuestDetails({ ...args, guestEmail: pending.guestEmail, numberOfGuests: pending.numberOfGuests });
-    if (!guest.ok) return notBooked("missing_information", guest.message, { missing: guest.missing });
+    if (guest.ok === false) return notBooked("missing_information", guest.message, { missing: guest.missing });
 
     const [offer] = await offersFor(scope, { ...parsed.dates, roomType: pending.roomType, guests: pending.numberOfGuests });
     const candidates = offer?.rooms ?? [];

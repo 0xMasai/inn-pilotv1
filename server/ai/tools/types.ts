@@ -27,6 +27,7 @@ export interface ConciergeTool {
   run(context: ToolContext, args: Record<string, unknown>): Promise<AiToolResult>;
 }
 
+/** Test failure with `hotel.ok === false`, not `!hotel.ok`: Vercel type-checks with strict off, where only the former narrows. */
 export type HotelArg = { ok: true; scope: HotelScope } | { ok: false; result: AiToolResult };
 
 /** Resolves the `hotel` argument, or the one result every unreachable id gets. */

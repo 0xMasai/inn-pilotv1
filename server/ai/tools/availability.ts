@@ -34,11 +34,11 @@ export const availabilityTool: ConciergeTool = {
 
   async run(context, args) {
     const hotel = await readHotelArg(context, args);
-    if (!hotel.ok) return hotel.result;
+    if (hotel.ok === false) return hotel.result;
     const { scope } = hotel;
 
     const parsed = readStayDates(args, context.now);
-    if (!parsed.ok) return { error: "invalid_dates", message: parsed.message };
+    if (parsed.ok === false) return { error: "invalid_dates", message: parsed.message };
     const { checkIn, checkOut, checkInDate, checkOutDate, nights } = parsed.dates;
 
     const guests = readInteger(args, "guests", 1, MAX_GUESTS);

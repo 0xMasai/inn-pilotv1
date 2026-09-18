@@ -101,7 +101,7 @@ export const searchHotelsTool: ConciergeTool = {
 
   async run(context, args) {
     const parsed = readStayDates(args, context.now);
-    if (!parsed.ok) return { error: "invalid_dates", message: parsed.message };
+    if (parsed.ok === false) return { error: "invalid_dates", message: parsed.message };
     const { checkIn, checkOut, checkInDate, checkOutDate, nights } = parsed.dates;
 
     const guests = readInteger(args, "guests", 1, MAX_GUESTS);

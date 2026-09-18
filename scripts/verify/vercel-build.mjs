@@ -15,11 +15,9 @@
  * runs the output — not the sources — behind a plain Node server, and makes
  * real requests to it. What it proves: every import resolves on plain Node,
  * each function has the default export the platform looks for, and the
- * routes answer. It also type-checks the functions the way Vercel does:
- * against the root tsconfig.json, not tsconfig.server.json, so an option
- * that only the server project sets (strict, say) does not count. What it
- * cannot prove: anything about Vercel's own infrastructure. That needs a
- * real deployment (DEPLOYMENT.md).
+ * routes answer. It also type-checks the functions with "strict" off, as
+ * Vercel's build does. What it cannot prove: anything about Vercel's own
+ * infrastructure. That needs a real deployment (DEPLOYMENT.md).
  *
  *   node scripts/verify/vercel-build.mjs
  *
@@ -71,26 +69,33 @@ try {
   rmSync(OUT, { recursive: true, force: true });
 
   /* ---------------- Type-check, the way the platform does ---------------- */
-  // Vercel checks each function against the nearest tsconfig.json (the
-  // root one) and fills in its own target and module settings. `tsc -b`
-  // never sees that combination, so a build that passes locally can still
-  // fail there, as it did when the root file had no "strict".
+  // Vercel type-checks each function itself, with "strict" off: setting it
+  // in the root tsconfig.json changed nothing in the deployment logs. With
+  // strict off, `if (!x.ok)` does not narrow a { ok: true } | { ok: false }
+  // union, but `if (x.ok === false)` does. `tsc -b` checks with strict on,
+  // so it never sees the difference. Vercel logs these errors without
+  // failing the deployment, so "Ready" proves nothing; this check does.
   const typecheckDir = join(OUT, "typecheck");
   mkdirSync(typecheckDir, { recursive: true });
   writeFileSync(
     join(typecheckDir, "tsconfig.json"),
     JSON.stringify({
-      extends: relative(typecheckDir, join(ROOT, "tsconfig.json")).replace(/\\/g, "/"),
-      files: null,
-      references: [],
-      compilerOptions: { noEmit: true, target: "ES2022", module: "ESNext", moduleResolution: "bundler", esModuleInterop: true, skipLibCheck: true },
+      compilerOptions: {
+        strict: false,
+        noEmit: true,
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "bundler",
+        esModuleInterop: true,
+        skipLibCheck: true,
+      },
       include: ["api", "server"].map((dir) => relative(typecheckDir, join(ROOT, dir)).replace(/\\/g, "/")),
     })
   );
   const tsc = spawnSync(process.execPath, [join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", typecheckDir], { encoding: "utf8" });
   const typeErrors = tsc.stdout.split("\n").filter((line) => /error TS\d+/.test(line));
   check(
-    "every function type-checks against the root tsconfig.json, as Vercel's build does",
+    "every function type-checks with strict off, as Vercel's build does",
     tsc.status === 0,
     typeErrors.slice(0, 5).join("; ") || tsc.stderr.trim().slice(0, 300)
   );

@@ -28,7 +28,7 @@ export const hotelInfoTool: ConciergeTool = {
 
   async run(context, args) {
     const hotel = await readHotelArg(context, args);
-    if (!hotel.ok) return hotel.result;
+    if (hotel.ok === false) return hotel.result;
     const { scope } = hotel;
     const { profile } = scope;
     const rooms = await loadRooms(scope);

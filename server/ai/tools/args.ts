@@ -58,6 +58,7 @@ export interface StayDates {
   nights: number;
 }
 
+/** Test failure with `parsed.ok === false`, not `!parsed.ok`: Vercel type-checks with strict off, where only the former narrows. */
 export type StayDatesResult = { ok: true; dates: StayDates } | { ok: false; message: string };
 
 export function readStayDates(args: Record<string, unknown>, now: Date = new Date()): StayDatesResult {

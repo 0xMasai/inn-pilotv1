@@ -21,6 +21,7 @@ export const PHONE_PATTERN = /^\+?[\d\s()-]{7,20}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_PATTERN = /\p{L}.*\p{L}/u;
 
+/** Test failure with `guest.ok === false`, not `!guest.ok`: Vercel type-checks with strict off, where only the former narrows. */
 export type GuestDetails =
   | { ok: true; guestName: string; guestPhone: string; guestEmail: string; numberOfGuests: number }
   | { ok: false; missing: string[]; message: string };
@@ -83,18 +84,18 @@ export const prepareBookingTool: ConciergeTool = {
 
   async run(context, args) {
     const hotel = await readHotelArg(context, args);
-    if (!hotel.ok) return notReady("unknown_hotel", String(hotel.result.message));
+    if (hotel.ok === false) return notReady("unknown_hotel", String(hotel.result.message));
     const { scope } = hotel;
 
     const roomType = readString(args, "roomType", 40);
     if (!roomType) return notReady("missing_information", "Which room type did the guest choose?", { missing: ["roomType"] });
 
     const parsed = readStayDates(args, context.now);
-    if (!parsed.ok) return notReady("invalid_dates", parsed.message);
+    if (parsed.ok === false) return notReady("invalid_dates", parsed.message);
     const { checkIn, checkOut, checkInDate, checkOutDate, nights } = parsed.dates;
 
     const guest = readGuestDetails(args);
-    if (!guest.ok) return notReady("missing_information", guest.message, { missing: guest.missing });
+    if (guest.ok === false) return notReady("missing_information", guest.message, { missing: guest.missing });
 
     const [offer] = await offersFor(scope, { checkIn, checkOut, nights, roomType, guests: guest.numberOfGuests });
     if (!offer) {

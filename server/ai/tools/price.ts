@@ -30,13 +30,13 @@ export const stayPriceTool: ConciergeTool = {
 
   async run(context, args) {
     const hotel = await readHotelArg(context, args);
-    if (!hotel.ok) return hotel.result;
+    if (hotel.ok === false) return hotel.result;
     const { scope } = hotel;
 
     const roomType = readString(args, "roomType", 40);
     if (!roomType) return { error: "missing_room_type", message: "roomType is required." };
     const parsed = readStayDates(args, context.now);
-    if (!parsed.ok) return { error: "invalid_dates", message: parsed.message };
+    if (parsed.ok === false) return { error: "invalid_dates", message: parsed.message };
     const { checkIn, checkOut, checkInDate, checkOutDate, nights } = parsed.dates;
     const guests = readInteger(args, "guests", 1, MAX_GUESTS);
     if (guests === null) return { error: "invalid_guests", message: `guests must be a whole number from 1 to ${MAX_GUESTS}.` };

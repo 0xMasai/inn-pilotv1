@@ -27,16 +27,40 @@ import { AiConfigurationError } from "./ai/errors";
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * Why a FIREBASE_SERVICE_ACCOUNT value is unusable, in terms of its shape
+ * only. Never echo the value itself: it is a private key.
+ */
+function serviceAccountProblem(raw: string, text: string): string {
+  const prefix = `FIREBASE_SERVICE_ACCOUNT is not valid service-account JSON (or base64 of it); the value is ${raw.length} characters`;
+  if (raw.startsWith("{")) {
+    // dotenv ends an unquoted value at the line break, so a key file pasted
+    // as-is arrives as just "{" or its first line.
+    return raw.length < 200
+      ? `${prefix} and starts with "{" — the JSON looks cut off at its first line. Put it on one line as base64 (see .env.example).`
+      : `${prefix} and starts with "{" but does not parse as JSON.`;
+  }
+  if (/^['"]/.test(raw)) return `${prefix} and starts with a quote — remove the quotes around it.`;
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(raw)) return `${prefix} and is neither JSON nor base64 — it may span lines or contain spaces.`;
+  if (!text.trimStart().startsWith("{")) return `${prefix} and is base64, but not of a JSON file — encode the whole key file.`;
+  return `${prefix}; it decodes from base64 but the JSON inside is incomplete — encode the key file again.`;
+}
+
 function parseServiceAccount(raw: string): Record<string, unknown> {
   const text = raw.startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
+  let parsed: unknown;
   try {
-    return JSON.parse(text) as Record<string, unknown>;
+    parsed = JSON.parse(text);
   } catch {
-    // Never echo the value: it is a private key.
+    throw new AiConfigurationError(serviceAccountProblem(raw, text));
+  }
+  const account = parsed as Record<string, unknown> | null;
+  if (typeof account?.private_key !== "string" || typeof account?.client_email !== "string") {
     throw new AiConfigurationError(
-      "FIREBASE_SERVICE_ACCOUNT is not valid service-account JSON (or base64 of it)."
+      "FIREBASE_SERVICE_ACCOUNT parses, but has no private_key or client_email — it is not a service-account key file."
     );
   }
+  return account;
 }
 
 function appOptions(env: Env): AppOptions {

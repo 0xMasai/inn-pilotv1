@@ -7,7 +7,7 @@
  * room is taken", "this booking is complete" and "this is what a booking
  * document looks like". Change a booking rule here, and both follow.
  */
-import type { BookingStatus } from "./collections";
+import type { BookingStatus } from "./collections.js";
 
 export interface DateLikeValue {
   toDate?: () => Date;

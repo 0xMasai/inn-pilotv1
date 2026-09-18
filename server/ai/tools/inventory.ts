@@ -12,10 +12,10 @@
  * rooms are free or what they cost.
  */
 import type { DocumentData, QueryDocumentSnapshot, Transaction } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../../src/lib/collections";
-import { isRoomBookable, nightlyRateOf, type BookableRoom, type BookingLike } from "../../../src/lib/booking";
-import { readAmenities, roomCapacityOf, roomTypeIncludes, roomTypeMatches } from "../../../src/lib/hotelListing";
-import type { HotelScope } from "../../hotels";
+import { COLLECTIONS } from "../../../src/lib/collections.js";
+import { isRoomBookable, nightlyRateOf, type BookableRoom, type BookingLike } from "../../../src/lib/booking.js";
+import { readAmenities, roomCapacityOf, roomTypeIncludes, roomTypeMatches } from "../../../src/lib/hotelListing.js";
+import type { HotelScope } from "../../hotels.js";
 
 export interface InventoryRoom extends BookableRoom {
   id: string;

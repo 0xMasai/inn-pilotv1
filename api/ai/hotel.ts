@@ -9,10 +9,10 @@
  * (DECISIONS D14). Figures come from the same room documents and rate
  * rules as the get_room_rates tool.
  */
-import { enforceRateLimit } from "../../server/ai/rateLimit";
-import { capacityRange, groupByType, loadRooms, rateRange } from "../../server/ai/tools/inventory";
-import { resolveHotel } from "../../server/hotels";
-import { errorMessage, guestMessageFor, isAiError, isRateLimitError } from "../../server/ai/errors";
+import { enforceRateLimit } from "../../server/ai/rateLimit.js";
+import { capacityRange, groupByType, loadRooms, rateRange } from "../../server/ai/tools/inventory.js";
+import { resolveHotel } from "../../server/hotels.js";
+import { errorMessage, guestMessageFor, isAiError, isRateLimitError } from "../../server/ai/errors.js";
 import {
   applyCors,
   clientKey,
@@ -22,8 +22,8 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from "../../server/ai/http";
-import type { ConciergeHotel } from "../../server/ai/types";
+} from "../../server/ai/http.js";
+import type { ConciergeHotel } from "../../server/ai/types.js";
 
 /** A page load, not a chat turn: looser than the concierge's limit. */
 const RATE_LIMIT = { limit: 30, windowMs: 60_000 };

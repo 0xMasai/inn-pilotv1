@@ -16,7 +16,7 @@ What has been verified locally is listed at the end.
 | Part | Where it runs | Built by |
 | --- | --- | --- |
 | The public AI Concierge (`/#/`), hotel links (`/#/c/:id`) and the staff PMS (`/#/staff`, `/#/dashboard`) | Vercel static hosting, from `dist/` | `npm run build` (Vite) |
-| `api/ai/concierge`, `api/ai/conversation`, `api/ai/network`, `api/ai/hotel`, `api/ai/health` | Vercel Node functions, one per file under `api/` | Vercel bundles each with esbuild |
+| `api/ai/concierge`, `api/ai/conversation`, `api/ai/network`, `api/ai/hotel`, `api/ai/health` | Vercel Node functions, one per file under `api/` | Vercel compiles each `.ts` file to its own `.js` and runs it as an ES module, so relative imports must end in `.js` |
 | Firestore data and `firestore.rules` | A Firebase project | `firebase deploy --only firestore:rules` — **GATED**, see §5 |
 
 The app uses `HashRouter`, so every route is a `#` fragment and the host only

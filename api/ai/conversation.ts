@@ -11,15 +11,15 @@
  * hotelId in the response. A thread started on a hotel's own link is only
  * readable with that hotel's `publicHotelId`; a network thread, without one.
  */
-import { enforceRateLimit } from "../../server/ai/rateLimit";
-import { readGuestThreadUpdates } from "../../server/guestConversations";
+import { enforceRateLimit } from "../../server/ai/rateLimit.js";
+import { readGuestThreadUpdates } from "../../server/guestConversations.js";
 import {
   AiInvalidRequestError,
   errorMessage,
   guestMessageFor,
   isAiError,
   isRateLimitError,
-} from "../../server/ai/errors";
+} from "../../server/ai/errors.js";
 import {
   applyCors,
   clientKey,
@@ -29,7 +29,7 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from "../../server/ai/http";
+} from "../../server/ai/http.js";
 
 /** A guest page polls every few seconds while staff reply. */
 const RATE_LIMIT = { limit: 40, windowMs: 60_000 };

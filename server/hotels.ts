@@ -31,12 +31,12 @@ import {
   type DocumentSnapshot,
   type Transaction,
 } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../src/lib/collections";
-import { DEFAULT_CURRENCY } from "../src/lib/format";
-import { toHotelListing, type HotelListing } from "../src/lib/hotelListing";
-import { isPublicHotelId, PUBLIC_HOTELS_COLLECTION } from "../src/lib/publicHotel";
-import { adminDb } from "./admin";
-import { AiInvalidRequestError } from "./ai/errors";
+import { COLLECTIONS } from "../src/lib/collections.js";
+import { DEFAULT_CURRENCY } from "../src/lib/format.js";
+import { toHotelListing, type HotelListing } from "../src/lib/hotelListing.js";
+import { isPublicHotelId, PUBLIC_HOTELS_COLLECTION } from "../src/lib/publicHotel.js";
+import { adminDb } from "./admin.js";
+import { AiInvalidRequestError } from "./ai/errors.js";
 
 /** Firestore document ids: no slashes, no traversal, nothing exotic. */
 const HOTEL_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;

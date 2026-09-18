@@ -7,10 +7,10 @@
  * the same listNetworkHotels() as search_hotels, so the page shows exactly the
  * hotels the concierge searches. Public ids only; never a hotelId.
  */
-import { enforceRateLimit } from "../../server/ai/rateLimit";
-import { loadRooms, rateRange } from "../../server/ai/tools/inventory";
-import { listNetworkHotels } from "../../server/hotels";
-import { errorMessage, guestMessageFor, isAiError, isRateLimitError } from "../../server/ai/errors";
+import { enforceRateLimit } from "../../server/ai/rateLimit.js";
+import { loadRooms, rateRange } from "../../server/ai/tools/inventory.js";
+import { listNetworkHotels } from "../../server/hotels.js";
+import { errorMessage, guestMessageFor, isAiError, isRateLimitError } from "../../server/ai/errors.js";
 import {
   applyCors,
   clientKey,
@@ -20,8 +20,8 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from "../../server/ai/http";
-import type { ConciergeNetwork, NetworkHotel } from "../../server/ai/types";
+} from "../../server/ai/http.js";
+import type { ConciergeNetwork, NetworkHotel } from "../../server/ai/types.js";
 
 /** A page load, not a chat turn. */
 const RATE_LIMIT = { limit: 30, windowMs: 60_000 };

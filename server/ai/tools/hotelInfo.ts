@@ -7,8 +7,8 @@
  * is listed in `notRecorded`, so the model has a fact to relay ("I can't
  * confirm that") instead of a gap to fill with a guess.
  */
-import { capacityRange, groupByType, loadRooms, rateRange } from "./inventory";
-import { placeOf, readHotelArg, type ConciergeTool } from "./types";
+import { capacityRange, groupByType, loadRooms, rateRange } from "./inventory.js";
+import { placeOf, readHotelArg, type ConciergeTool } from "./types.js";
 
 export const hotelInfoTool: ConciergeTool = {
   definition: {

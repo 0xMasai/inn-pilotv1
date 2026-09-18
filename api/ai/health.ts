@@ -12,9 +12,9 @@
  * latency and failure reason are operator detail: they go to the log, never
  * into the response, and the key appears in neither.
  */
-import { checkHealth } from "../../server/ai/provider";
-import { enforceRateLimit } from "../../server/ai/rateLimit";
-import { errorMessage, isAiError } from "../../server/ai/errors";
+import { checkHealth } from "../../server/ai/provider.js";
+import { enforceRateLimit } from "../../server/ai/rateLimit.js";
+import { errorMessage, isAiError } from "../../server/ai/errors.js";
 import {
   applyCors,
   clientKey,
@@ -24,7 +24,7 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from "../../server/ai/http";
+} from "../../server/ai/http.js";
 
 /** A probe costs a model call, so it is limited harder than a plain check. */
 const PROBE_RATE_LIMIT = { limit: 6, windowMs: 60_000 };

@@ -36,19 +36,19 @@ import {
   configuredModel,
   type Env,
   type GeminiConfig,
-} from "./config";
+} from "./config.js";
 import {
   AiConfigurationError,
   AiError,
   AiTimeoutError,
   AiUnavailableError,
   errorMessage,
-} from "./errors";
-import type { AiGeneration, AiHealthReport, AiMessage, GenerateInput } from "./types";
+} from "./errors.js";
+import type { AiGeneration, AiHealthReport, AiMessage, GenerateInput } from "./types.js";
 
-export { MAX_TOOL_ROUNDS } from "./config";
+export { MAX_TOOL_ROUNDS } from "./config.js";
 
-export type { GenerateInput } from "./types";
+export type { GenerateInput } from "./types.js";
 
 /**
  * One client per credential, reused across warm invocations — building it

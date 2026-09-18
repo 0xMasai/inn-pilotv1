@@ -12,10 +12,10 @@
  * and create_reservation will only book that exact summary, in a later turn,
  * after an explicit yes (DECISIONS D27).
  */
-import type { ConciergeQuote } from "../types";
-import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args";
-import { offersFor } from "./inventory";
-import { readHotelArg, type ConciergeTool } from "./types";
+import type { ConciergeQuote } from "../types.js";
+import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args.js";
+import { offersFor } from "./inventory.js";
+import { readHotelArg, type ConciergeTool } from "./types.js";
 
 export const PHONE_PATTERN = /^\+?[\d\s()-]{7,20}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

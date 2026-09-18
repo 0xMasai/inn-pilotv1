@@ -14,12 +14,12 @@
  * so a guest sees a real choice across properties rather than one hotel's
  * whole inventory.
  */
-import { matchesDestination, roomTypeMatches } from "../../../src/lib/hotelListing";
-import type { HotelScope } from "../../hotels";
-import type { ConciergeOption } from "../types";
-import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args";
-import { offersFor, type RoomTypeOffer } from "./inventory";
-import type { ConciergeTool } from "./types";
+import { matchesDestination, roomTypeMatches } from "../../../src/lib/hotelListing.js";
+import type { HotelScope } from "../../hotels.js";
+import type { ConciergeOption } from "../types.js";
+import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args.js";
+import { offersFor, type RoomTypeOffer } from "./inventory.js";
+import type { ConciergeTool } from "./types.js";
 
 export const MAX_OPTIONS = 5;
 const MAX_OPTIONS_PER_HOTEL = 2;

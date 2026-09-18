@@ -23,7 +23,7 @@
  */
 import { applicationDefault, cert, getApps, initializeApp, type App, type AppOptions } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { AiConfigurationError } from "./ai/errors";
+import { AiConfigurationError } from "./ai/errors.js";
 
 type Env = Record<string, string | undefined>;
 

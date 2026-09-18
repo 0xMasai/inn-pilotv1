@@ -13,7 +13,7 @@
  * would add a dependency and a round-trip to every guest message. It is a
  * budget guard, not a security control; treat it as such.
  */
-import { AiRateLimitError } from "./errors";
+import { AiRateLimitError } from "./errors.js";
 
 interface Window {
   /** Timestamps of recent hits, oldest first. */

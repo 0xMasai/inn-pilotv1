@@ -21,8 +21,8 @@
  * Built once per guest turn and cached for that turn: a search followed by a
  * price check reads the hotel list once.
  */
-import { isPublicHotelId } from "../src/lib/publicHotel";
-import { listNetworkHotels, resolveHotel, type HotelScope } from "./hotels";
+import { isPublicHotelId } from "../src/lib/publicHotel.js";
+import { listNetworkHotels, resolveHotel, type HotelScope } from "./hotels.js";
 
 export interface NetworkContext {
   /** The one hotel this conversation is limited to, or null for the whole network. */

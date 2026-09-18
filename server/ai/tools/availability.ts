@@ -9,9 +9,9 @@
  * Room types, counts and prices only — no room numbers (the hotel assigns the
  * room, D26) and nothing about other guests.
  */
-import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args";
-import { offersFor } from "./inventory";
-import { placeOf, readHotelArg, type ConciergeTool } from "./types";
+import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args.js";
+import { offersFor } from "./inventory.js";
+import { placeOf, readHotelArg, type ConciergeTool } from "./types.js";
 
 export const availabilityTool: ConciergeTool = {
   definition: {

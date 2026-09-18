@@ -34,9 +34,9 @@ import {
   supportsToolCalling,
   type Env,
   type GroqConfig,
-} from "./config";
-import { AiConfigurationError, AiError, AiTimeoutError, AiUnavailableError, errorMessage } from "./errors";
-import type { AiGeneration, AiHealthReport, AiMessage, AiToolResult, GenerateInput } from "./types";
+} from "./config.js";
+import { AiConfigurationError, AiError, AiTimeoutError, AiUnavailableError, errorMessage } from "./errors.js";
+import type { AiGeneration, AiHealthReport, AiMessage, AiToolResult, GenerateInput } from "./types.js";
 
 /**
  * A 429 asking us to wait longer than this is a spent minute or day, not a

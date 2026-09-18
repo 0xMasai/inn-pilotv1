@@ -31,16 +31,16 @@ import {
   makeReservationId,
   nightlyRateOf,
   validateBookingDetails,
-} from "../../../src/lib/booking";
-import { COLLECTIONS } from "../../../src/lib/collections";
-import { isExplicitConfirmation } from "../../../src/lib/confirmation";
-import { normalizeRoomType } from "../../../src/lib/hotelListing";
-import type { HotelScope } from "../../hotels";
-import type { ConciergeBooking, PendingBooking } from "../types";
-import { readStayDates, readString, type StayDates } from "./args";
-import { offersFor, readRoomForBooking } from "./inventory";
-import { readGuestDetails } from "./prepareBooking";
-import { readHotelArg, type ConciergeTool } from "./types";
+} from "../../../src/lib/booking.js";
+import { COLLECTIONS } from "../../../src/lib/collections.js";
+import { isExplicitConfirmation } from "../../../src/lib/confirmation.js";
+import { normalizeRoomType } from "../../../src/lib/hotelListing.js";
+import type { HotelScope } from "../../hotels.js";
+import type { ConciergeBooking, PendingBooking } from "../types.js";
+import { readStayDates, readString, type StayDates } from "./args.js";
+import { offersFor, readRoomForBooking } from "./inventory.js";
+import { readGuestDetails } from "./prepareBooking.js";
+import { readHotelArg, type ConciergeTool } from "./types.js";
 
 /** A summary older than this must be prepared (and re-checked) again. */
 export const PENDING_BOOKING_TTL_MS = 60 * 60_000;

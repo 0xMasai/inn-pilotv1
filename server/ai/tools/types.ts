@@ -1,6 +1,6 @@
-import type { HotelScope } from "../../hotels";
-import type { NetworkContext } from "../../network";
-import type { AiToolDefinition, AiToolResult, PendingBooking } from "../types";
+import type { HotelScope } from "../../hotels.js";
+import type { NetworkContext } from "../../network.js";
+import type { AiToolDefinition, AiToolResult, PendingBooking } from "../types.js";
 
 /**
  * Everything a tool may know about the turn it runs in.

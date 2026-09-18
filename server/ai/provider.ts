@@ -13,10 +13,10 @@
  * Vercel environment change, not a deploy of different code. Adding one
  * (e.g. a local Ollama for development) is a new module plus an entry here.
  */
-import { resolveProviderName, type AiProviderName, type Env } from "./config";
-import * as gemini from "./gemini";
-import * as groq from "./groq";
-import type { AiGeneration, AiHealthReport, GenerateInput } from "./types";
+import { resolveProviderName, type AiProviderName, type Env } from "./config.js";
+import * as gemini from "./gemini.js";
+import * as groq from "./groq.js";
+import type { AiGeneration, AiHealthReport, GenerateInput } from "./types.js";
 
 export interface AiProvider {
   generate(input: GenerateInput): Promise<AiGeneration>;

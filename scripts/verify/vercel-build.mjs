@@ -2,28 +2,31 @@
  * Does the API survive the way Vercel actually builds it?
  *
  * `npm run dev:api` runs the handlers through tsx, which resolves anything.
- * Vercel does not: it bundles each file under api/ with esbuild and runs the
- * single ESM artifact on Node, with the packages from package.json installed
- * beside it. `package.json` sets "type": "module", and api/ and server/ use
- * extensionless relative imports — the combination that broke the previous
- * AI layer on Vercel (PROJECT_STATUS, Deployment).
+ * Vercel does not bundle. It compiles every TypeScript file a function
+ * reaches to its own .js file, side by side (/var/task/api/ai/health.js,
+ * /var/task/server/ai/provider.js, …), and runs them on Node as native ES
+ * modules, because package.json sets "type": "module". Node's ESM loader
+ * never guesses an extension, so a relative import must name the compiled
+ * file: `../../server/ai/provider.js`, not `../../server/ai/provider`. An
+ * extensionless import works under tsx and Vite and crashes every function
+ * in production with ERR_MODULE_NOT_FOUND.
  *
- * So this bundles the handlers the same way, runs the bundles — not the
- * sources — behind a plain Node server, and makes real requests to them.
- * What it proves: every import resolves in a bundle, each function has the
- * default export the platform looks for, and the routes answer. What it
- * cannot prove: anything about Vercel's own infrastructure. That needs a
- * real deployment (DEPLOYMENT.md).
+ * So this compiles api/, server/ and src/lib/ file by file the same way,
+ * runs the output — not the sources — behind a plain Node server, and makes
+ * real requests to it. What it proves: every import resolves on plain Node,
+ * each function has the default export the platform looks for, and the
+ * routes answer. What it cannot prove: anything about Vercel's own
+ * infrastructure. That needs a real deployment (DEPLOYMENT.md).
  *
  *   node scripts/verify/vercel-build.mjs
  *
  * With the emulator seeded (npm run seed:emulator), it also checks a real
- * hotel lookup through the bundle:
+ * hotel lookup through the compiled output:
  *
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_PROJECT_ID=innpilot-ui-verify \
  *     node scripts/verify/vercel-build.mjs
  */
-import { readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import http from "node:http";
@@ -43,16 +46,20 @@ const check = (name, pass, detail = "") => {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
 };
 
-/** Every api/**\/*.ts, which is exactly what Vercel turns into a function. */
-function handlerFiles(dir) {
+/** Every .ts file under `dir`. */
+function tsFiles(dir) {
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) return handlerFiles(full);
+    if (statSync(full).isDirectory()) return tsFiles(full);
     return entry.endsWith(".ts") ? [full] : [];
   });
 }
 
-const sources = handlerFiles(join(ROOT, "api"));
+/** Every api/**\/*.ts, which is exactly what Vercel turns into a function. */
+const sources = tsFiles(join(ROOT, "api"));
+/** Everything a function can import from our own code. */
+const compiled = [...sources, ...tsFiles(join(ROOT, "server")), ...tsFiles(join(ROOT, "src", "lib"))];
+const outputOf = (source) => join(OUT, relative(ROOT, source)).replace(/\.ts$/, ".js");
 const routeOf = (file) => `/${relative(ROOT, file).replace(/\\/g, "/").replace(/\.ts$/, "")}`;
 
 let server;
@@ -60,47 +67,52 @@ try {
   rmSync(OUT, { recursive: true, force: true });
 
   /* ---------------- Build, the way the platform does ---------------- */
+  // One .js per .ts, imports left exactly as written: no bundling, so an
+  // import Node can't resolve on its own fails here as it would on Vercel.
   await build({
-    entryPoints: sources,
+    entryPoints: compiled,
     outdir: OUT,
-    outbase: join(ROOT, "api"),
-    bundle: true,
+    outbase: ROOT,
+    bundle: false,
     platform: "node",
     format: "esm",
     target: "node20",
-    // Dependencies are installed from package.json beside the function,
-    // so they stay external; only our own source is bundled in.
-    packages: "external",
-    outExtension: { ".js": ".mjs" },
     logLevel: "silent",
   });
-  check(`every function bundles for the Node runtime (${sources.length} of them)`, true);
+  writeFileSync(join(OUT, "package.json"), JSON.stringify({ type: "module" }));
+  check(`every source compiles for the Node runtime (${compiled.length} files, ${sources.length} functions)`, true);
 
-  /* ---------------- Load the bundles, not the sources ---------------- */
+  /* ---------------- Load the compiled output, not the sources ---------------- */
   const routes = {};
+  const unloadable = [];
   for (const source of sources) {
-    const bundle = join(OUT, relative(join(ROOT, "api"), source).replace(/\.ts$/, ".mjs"));
-    const loaded = await import(pathToFileURL(bundle).href);
-    routes[routeOf(source)] = loaded.default;
+    try {
+      const loaded = await import(pathToFileURL(outputOf(source)).href);
+      routes[routeOf(source)] = loaded.default;
+    } catch (error) {
+      unloadable.push(`${routeOf(source)}: ${error.code ?? ""} ${error.message.split("\n")[0]}`);
+    }
   }
+  check("every function loads on plain Node, imports and all", unloadable.length === 0, unloadable.join("; "));
+  if (unloadable.length) throw new Error("A function cannot load; the checks below would only repeat it.");
   const missing = Object.entries(routes).filter(([, handler]) => typeof handler !== "function");
   check(
-    "each bundle exports the default handler the platform calls",
+    "each function exports the default handler the platform calls",
     missing.length === 0,
     missing.map(([route]) => route).join(", ")
   );
 
-  // A bundled secret would ship the key to anyone who can read the artifact.
-  const leaked = sources
-    .map((source) => join(OUT, relative(join(ROOT, "api"), source).replace(/\.ts$/, ".mjs")))
-    .filter((bundle) => {
-      const code = readFileSync(bundle, "utf8");
+  // A compiled-in secret would ship the key to anyone who can read the artifact.
+  const leaked = compiled
+    .map(outputOf)
+    .filter((output) => {
+      const code = readFileSync(output, "utf8");
       const realGroqKey = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.length >= 12 ? process.env.GROQ_API_KEY : null;
       return /AIza[A-Za-z0-9_-]{10}|gsk_[A-Za-z0-9]{20,}|BEGIN PRIVATE KEY/.test(code) || (realGroqKey !== null && code.includes(realGroqKey));
     });
-  check("no credential is baked into a bundle", leaked.length === 0, leaked.join(", "));
+  check("no credential is compiled into a function", leaked.length === 0, leaked.join(", "));
 
-  /* ---------------- Serve the bundles and call them ---------------- */
+  /* ---------------- Serve the compiled functions and call them ---------------- */
   const asApiResponse = (res) => {
     let statusCode = 200;
     return {
@@ -159,7 +171,7 @@ try {
   // depends on whether this run can reach a database: 400 "no such hotel"
   // when it can, 503 "can't reach the assistant" when there is no usable
   // credential. Both are right, and what matters either way is that a
-  // bundled function answers at all, that a guest could be shown the
+  // compiled function answers at all, that a guest could be shown the
   // message, and that it carries no id and no stack trace.
   check(
     "the built concierge refuses an unknown hotel safely, with no model call",

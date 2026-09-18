@@ -6,15 +6,15 @@
  * id may resolve to (DECISIONS D25). No tool takes a hotelId argument, and
  * no result carries one.
  */
-import { errorMessage } from "../errors";
-import type { AiToolDefinition, AiToolExecutor } from "../types";
-import { availabilityTool } from "./availability";
-import { createReservationTool } from "./createReservation";
-import { hotelInfoTool } from "./hotelInfo";
-import { prepareBookingTool } from "./prepareBooking";
-import { stayPriceTool } from "./price";
-import { searchHotelsTool } from "./search";
-import type { ConciergeTool, ToolContext } from "./types";
+import { errorMessage } from "../errors.js";
+import type { AiToolDefinition, AiToolExecutor } from "../types.js";
+import { availabilityTool } from "./availability.js";
+import { createReservationTool } from "./createReservation.js";
+import { hotelInfoTool } from "./hotelInfo.js";
+import { prepareBookingTool } from "./prepareBooking.js";
+import { stayPriceTool } from "./price.js";
+import { searchHotelsTool } from "./search.js";
+import type { ConciergeTool, ToolContext } from "./types.js";
 
 export const CONCIERGE_TOOLS: readonly ConciergeTool[] = [
   searchHotelsTool,
@@ -65,4 +65,4 @@ export function createToolbox(context: ToolContext, requestId = ""): Toolbox {
   };
 }
 
-export type { ToolContext } from "./types";
+export type { ToolContext } from "./types.js";

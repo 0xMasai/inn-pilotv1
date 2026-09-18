@@ -12,7 +12,10 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode: Vercel and tsx both resolve extensionless imports. */
+    /* Relative imports must end in .js (resolved here to the .ts source):
+       Vercel runs each compiled file as a native ES module, and Node's ESM
+       loader never adds an extension. `npm run verify:vercel` catches a
+       missing one; tsx and Vite would hide it. */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

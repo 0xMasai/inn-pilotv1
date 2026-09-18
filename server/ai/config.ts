@@ -11,7 +11,7 @@
  * Everything is overridable per deployment so switching model or tightening
  * a timeout is an environment change, never a code change.
  */
-import { AiConfigurationError } from "./errors";
+import { AiConfigurationError } from "./errors.js";
 
 export interface GeminiConfig {
   apiKey: string;

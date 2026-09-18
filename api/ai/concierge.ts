@@ -18,10 +18,10 @@
  * (every listed hotel). With one — a hotel's own concierge link — only that
  * hotel. A workspace hotelId is never accepted and never sent back (D2, D14).
  */
-import { generate } from "../../server/ai/provider";
-import { conciergeSystemPrompt } from "../../server/ai/prompts/concierge";
-import { enforceRateLimit } from "../../server/ai/rateLimit";
-import { createToolbox } from "../../server/ai/tools";
+import { generate } from "../../server/ai/provider.js";
+import { conciergeSystemPrompt } from "../../server/ai/prompts/concierge.js";
+import { enforceRateLimit } from "../../server/ai/rateLimit.js";
+import { createToolbox } from "../../server/ai/tools/index.js";
 import {
   openGuestThread,
   recordGuestTurn,
@@ -29,18 +29,18 @@ import {
   threadHandledBy,
   type GuestThread,
   type GuestTurn,
-} from "../../server/guestConversations";
-import type { HotelScope } from "../../server/hotels";
-import { createNetworkContext, type NetworkContext } from "../../server/network";
-import { isTurnId } from "../../server/conversations";
-import { HUMAN_HOLDING_REPLY } from "../../src/lib/conversations";
+} from "../../server/guestConversations.js";
+import type { HotelScope } from "../../server/hotels.js";
+import { createNetworkContext, type NetworkContext } from "../../server/network.js";
+import { isTurnId } from "../../server/conversations.js";
+import { HUMAN_HOLDING_REPLY } from "../../src/lib/conversations.js";
 import {
   AiInvalidRequestError,
   errorMessage,
   guestMessageFor,
   isAiError,
   isRateLimitError,
-} from "../../server/ai/errors";
+} from "../../server/ai/errors.js";
 import {
   applyCors,
   clientKey,
@@ -51,7 +51,7 @@ import {
   sendJson,
   type ApiRequest,
   type ApiResponse,
-} from "../../server/ai/http";
+} from "../../server/ai/http.js";
 import type {
   AiMessage,
   AiToolExecutor,
@@ -64,7 +64,7 @@ import type {
   ConciergeSearch,
   PendingBooking,
   TurnTrace,
-} from "../../server/ai/types";
+} from "../../server/ai/types.js";
 
 /** Generous for a person typing, restrictive for a script. */
 const RATE_LIMIT = { limit: 12, windowMs: 60_000 };

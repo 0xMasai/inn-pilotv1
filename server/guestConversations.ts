@@ -21,12 +21,12 @@
  * then updated on every turn.
  */
 import type { DocumentReference } from "firebase-admin/firestore";
-import { toDate, toMessage, type ConversationMessage, type Handler, type MessageRole } from "../src/lib/conversations";
-import { MAX_MESSAGE_TEXT } from "../src/lib/conversations";
-import { adminDb } from "./admin";
-import type { PendingBooking } from "./ai/types";
-import { isTurnId, openMirror, readConversation, recordTurn, type HotelSelection } from "./conversations";
-import { scopeForHotelId, type HotelScope } from "./hotels";
+import { toDate, toMessage, type ConversationMessage, type Handler, type MessageRole } from "../src/lib/conversations.js";
+import { MAX_MESSAGE_TEXT } from "../src/lib/conversations.js";
+import { adminDb } from "./admin.js";
+import type { PendingBooking } from "./ai/types.js";
+import { isTurnId, openMirror, readConversation, recordTurn, type HotelSelection } from "./conversations.js";
+import { scopeForHotelId, type HotelScope } from "./hotels.js";
 
 export const GUEST_CONVERSATIONS_COLLECTION = "conciergeConversations";
 /** More hotels than one guest reasonably compares; bounds the writes per turn. */

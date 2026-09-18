@@ -14,7 +14,7 @@
  * Pure — no Firestore import — so the app, the server and the tests share
  * one definition. Keep `lead` in sync with firestore.rules.
  */
-import type { ConversationBookingState, LeadAssessment, LeadScore } from "./conversations";
+import type { ConversationBookingState, LeadAssessment, LeadScore } from "./conversations.js";
 
 /**
  * What a guest has shown so far. Booleans only ever turn on: a conversation

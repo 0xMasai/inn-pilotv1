@@ -10,7 +10,7 @@
  * one thread.
  */
 import type { DocumentReference } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../src/lib/collections";
+import { COLLECTIONS } from "../src/lib/collections.js";
 import {
   advanceBookingState,
   isConversationId,
@@ -23,17 +23,17 @@ import {
   type ConversationMessage,
   type Handler,
   type MessageRole,
-} from "../src/lib/conversations";
+} from "../src/lib/conversations.js";
 import {
   bookingSignals,
   detectSignals,
   mergeSignals,
   scoreLead,
   toLeadSignals,
-} from "../src/lib/leadScoring";
-import type { HotelScope } from "./hotels";
+} from "../src/lib/leadScoring.js";
+import type { HotelScope } from "./hotels.js";
 
-export type { HotelSelection } from "../src/lib/conversations";
+export type { HotelSelection } from "../src/lib/conversations.js";
 
 export interface OpenConversation {
   id: string;

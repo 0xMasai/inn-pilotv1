@@ -16,7 +16,7 @@
  * Pure — no Firestore import — so the app, the server and the tests share
  * one definition. Keep the enums in sync with firestore.rules.
  */
-import { toLeadSignals, type LeadSignals } from "./leadScoring";
+import { toLeadSignals, type LeadSignals } from "./leadScoring.js";
 
 
 export const CHANNELS = ["web", "whatsapp", "instagram", "email"] as const;

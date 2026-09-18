@@ -5,9 +5,9 @@
  * for the dates right now (offersFor()). It re-checks availability because
  * a price for a room that's gone is not a price. Books nothing.
  */
-import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args";
-import { offersFor } from "./inventory";
-import { placeOf, readHotelArg, type ConciergeTool } from "./types";
+import { MAX_GUESTS, readInteger, readStayDates, readString } from "./args.js";
+import { offersFor } from "./inventory.js";
+import { placeOf, readHotelArg, type ConciergeTool } from "./types.js";
 
 export const stayPriceTool: ConciergeTool = {
   definition: {

@@ -1,0 +1,37 @@
+# `npx vercel` uploads the working directory and does not read .gitignore.
+# Without this file a CLI deploy would ship .env (API keys) and any
+# service-account key in the tree. Production secrets live only in the
+# Vercel project's environment variables (DEPLOYMENT.md §3).
+
+# --- Secrets ----------------------------------------------------------------
+.env
+.env.*
+!.env.example
+serviceAccountKey.json
+*serviceAccountKey*.json
+*service-account*.json
+*service_account*.json
+*-firebase-adminsdk-*.json
+*credentials*.json
+*.pem
+*.key
+*.p8
+*.pfx
+*.p12
+id_rsa*
+id_ed25519*
+
+# --- Local build output: Vercel builds its own dist ---------------------------
+dist
+dist-electron
+dist-ssr
+release
+coverage
+*.tsbuildinfo
+tsc_output.txt
+
+# --- Emulator data and logs ---------------------------------------------------
+.firebase
+emulator-data
+firebase-export-*
+*.log

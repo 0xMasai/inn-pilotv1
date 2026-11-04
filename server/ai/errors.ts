@@ -18,9 +18,8 @@ export type AiErrorCode =
   | "unavailable";
 
 /** Fallback copy for a failure with nothing more specific to say. */
-const DEFAULT_GUEST_MESSAGE =
-  "I can't reach the hotel assistant right now. Please try again in a " +
-  "moment, or contact the hotel team directly and they'll help you.";
+export const DEFAULT_GUEST_MESSAGE =
+  "I can't reach the concierge right now. Send again, or contact the hotel team directly and they'll help you.";
 
 export class AiError extends Error {
   readonly code: AiErrorCode;
@@ -73,7 +72,7 @@ export class AiRateLimitError extends AiError {
       429,
       `Rate limit exceeded; retry in ${retryAfterSeconds}s.`,
       "You're sending messages faster than I can answer them. " +
-        "Give me a few seconds and try again."
+        "Give me a few seconds and send again."
     );
     this.name = "AiRateLimitError";
     this.retryAfterSeconds = retryAfterSeconds;
@@ -87,7 +86,7 @@ export class AiTimeoutError extends AiError {
       504,
       `The model did not respond within ${timeoutMs}ms.`,
       "That took longer than expected and I had to stop waiting. " +
-        "Please try asking again."
+        "Send again."
     );
     this.name = "AiTimeoutError";
   }

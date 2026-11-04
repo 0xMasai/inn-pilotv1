@@ -84,6 +84,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
+    "@grpc/grpc-js": "^1.12.0",
     "@tailwindcss/vite": "^4.1.16",
     "@tippyjs/react": "^4.2.6",
     "firebase": "^12.4.0",

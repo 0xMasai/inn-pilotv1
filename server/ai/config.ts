@@ -63,7 +63,7 @@ function read(env: Env, key: string): string | undefined {
   return value && value.trim() ? value.trim() : undefined;
 }
 
-function readNumber(
+export function readNumber(
   env: Env,
   key: string,
   fallback: number,
@@ -140,6 +140,28 @@ export function resolveProviderName(env: Env = process.env): AiProviderName {
     throw new AiConfigurationError(`AI_PROVIDER must be one of ${AI_PROVIDERS.join(", ")}, got '${raw}'.`);
   }
   return raw as AiProviderName;
+}
+
+/** Optional fallback provider that activates when the primary is rate-limited. */
+export interface FallbackProviderConfig {
+  provider: AiProviderName;
+  model: string;
+}
+
+export function resolveFallbackProvider(env: Env = process.env): FallbackProviderConfig | null {
+  const raw = read(env, "AI_FALLBACK_PROVIDER")?.toLowerCase();
+  if (!raw) return null;
+  if (!(AI_PROVIDERS as readonly string[]).includes(raw)) {
+    throw new AiConfigurationError(`AI_FALLBACK_PROVIDER must be one of ${AI_PROVIDERS.join(", ")}, got '${raw}'.`);
+  }
+  const provider = raw as AiProviderName;
+  let model: string;
+  if (provider === "groq") {
+    model = read(env, "AI_FALLBACK_GROQ_MODEL") ?? configuredGroqModel(env);
+  } else {
+    model = read(env, "AI_FALLBACK_GEMINI_MODEL") ?? configuredModel(env);
+  }
+  return { provider, model };
 }
 
 /* ------------------------------------------------------------------ */

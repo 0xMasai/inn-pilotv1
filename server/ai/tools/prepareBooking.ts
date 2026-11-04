@@ -128,8 +128,7 @@ export const prepareBookingTool: ConciergeTool = {
       summary,
       guidance:
         "Show this booking summary (hotel, room, check-in, check-out, nights, guest, total) and ask exactly: " +
-        "\"Would you like me to confirm this booking?\" Nothing is booked yet. Do not call create_reservation until the " +
-        "guest replies with a clear yes in their next message.",
+        "\"Would you like me to confirm this booking?\" Nothing is booked yet. Do not call create_reservation until the guest replies with a clear yes.",
     };
   },
 };

@@ -39,7 +39,7 @@ export const HISTORY_TURNS_SENT = 12;
 export const MAX_MESSAGE_CHARS = 2_000;
 
 const NETWORK_ERROR =
-  "I can't reach the concierge right now. Check your connection and try again in a moment.";
+  "I can't reach the concierge right now. Check your connection and send again.";
 
 /** A failure the guest can read. `retryable` is false when trying again won't help. */
 export class ConciergeError extends Error {

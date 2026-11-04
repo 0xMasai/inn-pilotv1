@@ -92,7 +92,7 @@ export interface EntryActions {
   onEdit: () => void;
 }
 
-export function MessageBubble({ entry, actions }: { entry: ChatEntry; actions: EntryActions }) {
+export function MessageBubble({ entry, actions, sending }: { entry: ChatEntry; actions: EntryActions; sending: Set<string> }) {
   if (entry.role === "user") {
     return (
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
@@ -103,7 +103,12 @@ export function MessageBubble({ entry, actions }: { entry: ChatEntry; actions: E
           >
             {entry.text}
           </div>
-          {entry.failed && (
+          {sending.has(entry.id) && (
+            <p className="text-xs mt-1 text-right flex items-center justify-end gap-1" style={{ color: "var(--text-secondary)" }}>
+              <RotateCcw size={11} className="animate-spin" /> Sending…
+            </p>
+          )}
+          {entry.failed && !sending.has(entry.id) && (
             <p className="text-xs mt-1 text-right" style={{ color: "var(--danger-text)" }}>
               Not delivered
             </p>
@@ -165,8 +170,7 @@ export function MessageBubble({ entry, actions }: { entry: ChatEntry; actions: E
 
 const WAITING_STEPS = [
   "Understanding your request…",
-  "Searching K Hotels properties…",
-  "Checking live availability and prices…",
+  "Checking availability…",
   "Almost there…",
 ];
 

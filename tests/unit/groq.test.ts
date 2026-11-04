@@ -37,7 +37,7 @@ vi.mock("groq-sdk", () => ({
   },
 }));
 
-import { generate, checkHealth, parseRetryAfter, resetGroqClient, MAX_RATE_LIMIT_WAIT_MS } from "../../server/ai/groq";
+import { generate, checkHealth, parseRetryAfter, resetGroqClient, MAX_RATE_LIMIT_WAIT_MS, MAX_CALL_ATTEMPTS } from "../../server/ai/groq";
 import { checkHealth as providerHealth, providerFor } from "../../server/ai/provider";
 import { DEFAULT_GROQ_MODEL, MAX_TOOL_ROUNDS } from "../../server/ai/config";
 import { AiConfigurationError, AiTimeoutError, AiUnavailableError, guestMessageFor } from "../../server/ai/errors";
@@ -108,7 +108,7 @@ describe("requests", () => {
       })
     );
 
-    expect(result).toEqual({ text: "Hello!", model: "openai/gpt-oss-20b", usage: { inputTokens: 100, outputTokens: 10 }, toolCalls: [] });
+    expect(result).toEqual({ text: "Hello!", model: "openai/gpt-oss-20b", usage: { inputTokens: 100, outputTokens: 10 }, toolCalls: [], retryAttempt: 0 });
     expect(sdk.requests[0]).toEqual({
       model: "openai/gpt-oss-20b",
       messages: [
@@ -245,7 +245,7 @@ describe("failures and the retry budget", () => {
     await expect(attempt).rejects.toBeInstanceOf(AiConfigurationError);
     const error = await attempt.catch((e) => e);
     expect(error.status).toBe(503);
-    expect(guestMessageFor(error)).toMatch(/can't reach the hotel assistant right now/);
+    expect(guestMessageFor(error)).toMatch(/can't reach the concierge right now/);
     expect(sdk.requests).toHaveLength(0);
   });
 
@@ -274,10 +274,10 @@ describe("failures and the retry budget", () => {
     expect(sdk.requests).toHaveLength(2);
   });
 
-  it("retries at most once, even when the second attempt is also rate limited", async () => {
-    sdk.script = [apiError(429, { "retry-after": "0.01" }), apiError(429, { "retry-after": "0.01" }), text("never reached")];
+  it("retries up to MAX_CALL_ATTEMPTS times, then fails", async () => {
+    sdk.script = [apiError(429, { "retry-after": "0.01" }), apiError(429, { "retry-after": "0.01" }), apiError(429, { "retry-after": "0.01" })];
     await expect(generate(input())).rejects.toBeInstanceOf(AiUnavailableError);
-    expect(sdk.requests).toHaveLength(2);
+    expect(sdk.requests).toHaveLength(MAX_CALL_ATTEMPTS);
   });
 
   it("does not wait for a retry-after that would outlast the turn", async () => {
@@ -286,14 +286,14 @@ describe("failures and the retry budget", () => {
     expect(sdk.requests).toHaveLength(1);
   });
 
-  it("retries a 5xx or a dropped connection once", async () => {
+  it("retries a 5xx or a dropped connection with exponential backoff", async () => {
     sdk.script = [apiError(503), text("recovered")];
     expect((await generate(input())).text).toBe("recovered");
     sdk.script = [new Error("Connection error."), text("recovered again")];
     expect((await generate(input())).text).toBe("recovered again");
-    sdk.script = [apiError(500), apiError(502)];
+    sdk.script = [apiError(500), apiError(502), apiError(503)];
     await expect(generate(input())).rejects.toBeInstanceOf(AiUnavailableError);
-    expect(sdk.requests).toHaveLength(6);
+    expect(sdk.requests).toHaveLength(7);
   });
 
   it("retries a tool call Groq could not parse (tool_use_failed) once", async () => {

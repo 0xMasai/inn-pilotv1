@@ -80,9 +80,9 @@ export const searchHotelsTool: ConciergeTool = {
   definition: {
     name: "search_hotels",
     description:
-      "Search every participating hotel for rooms that are free for a stay, with live nightly rates and stay totals. " +
-      "Call it as soon as you know the check-in and check-out dates. Destination, room type and guest count are optional " +
-      "filters: pass whatever the guest said. Returns at most 5 ranked options.",
+      "Search every participating hotel for free rooms with live nightly rates and stay totals. " +
+      "Call it as soon as you know check-in and check-out dates. Destination, room type and guest count are optional filters. " +
+      "Returns at most 5 ranked options.",
     parameters: {
       type: "object",
       properties: {
@@ -189,7 +189,7 @@ export const searchHotelsTool: ConciergeTool = {
       guidance: [
         "This is a live snapshot, not a hold. Nothing is booked until create_reservation confirms it.",
         foundRequestedType
-          ? "Present the options briefly, numbered, with hotel, location, room type, price per night and stay total. Say \"Here are N available options\" — don't call any option the best."
+          ? "Present the options briefly, numbered, with hotel, location, room type, price per night and stay total. Say \"Here are N available options\"."
           : `No ${roomType} room is free; these are other room types at matching hotels. Say that first.`,
         "capacity null means the hotel hasn't recorded how many the room sleeps: don't claim it fits the party.",
         "Use the `hotel` value of the chosen option in every later tool call.",

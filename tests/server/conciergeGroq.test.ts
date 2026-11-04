@@ -228,7 +228,7 @@ describe("the confirmation barrier holds against the model", () => {
 });
 
 describe("provider failures reach the guest as the safe unavailable response", () => {
-  const SAFE = "I can't reach the hotel assistant right now. Please try again in a moment, or contact the hotel team directly and they'll help you.";
+  const SAFE = "I can't reach the concierge right now. Send again, or contact the hotel team directly and they'll help you.";
 
   function expectNothingLeaked(body: Record<string, unknown>) {
     const text = JSON.stringify(body);

@@ -209,6 +209,11 @@ export async function recordTurn(scope: HotelScope, conversation: OpenConversati
         : {}),
       ...(turn.booking
         ? {
+            // A confirmed booking consumes the pending summary: clearing it so a
+            // retried turn (same turnId, response lost) cannot confirm—and book—a
+            // second reservation. The existing reservation is preserved and the
+            // price re-check path in create_reservation is untouched.
+            pendingBooking: null,
             reservationId: turn.booking.reservationId,
             guestName: turn.booking.guestName || WEB_GUEST_NAME,
             guestContact: turn.booking.guestPhone,

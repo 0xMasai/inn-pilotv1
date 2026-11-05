@@ -156,7 +156,6 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
   const [pollError, setPollError] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [checking, setChecking] = useState(false);
-  const [retrying, setRetrying] = useState<{ attempt: number; max: number } | null>(null);
   const afterRef = useRef(thread?.after ?? 0);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -222,7 +221,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [entries, pending, error, sending, checking, retrying]);
+  }, [entries, pending, error, sending, checking]);
 
   /** One guest turn. `retrying` resends the last undelivered message instead of adding one. */
   const send = useCallback(
@@ -252,89 +251,58 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
       setChecking(true);
       setSending((current) => new Set([...current, userId]));
 
-      const maxClientRetries = 3;
-      let lastError: ConciergeError | null = null;
-
-      for (let clientAttempt = 0; clientAttempt <= maxClientRetries; clientAttempt++) {
-        if (clientAttempt > 0) {
-          setRetrying({ attempt: clientAttempt, max: maxClientRetries });
-          // Back off between client retries.
-          await new Promise((resolve) => setTimeout(resolve, 1000 * clientAttempt));
+      try {
+        const reply = await sendConciergeMessage(message, historyOf(history), {
+          publicHotelId,
+          conversationId,
+          turnId: userId,
+        });
+        if (reply.conversationId) {
+          setThread({ conversationId: reply.conversationId, handledBy: reply.handledBy ?? "ai", after: afterRef.current });
         }
+        setEntries((current) => [
+          ...current,
+          {
+            id: newId(),
+            role: "assistant",
+            text: reply.reply,
+            ...(reply.search ? { search: reply.search } : {}),
+            ...(reply.availability ? { availability: reply.availability } : {}),
+            ...(reply.quote ? { quote: reply.quote } : {}),
+            ...(reply.booking ? { booking: reply.booking } : {}),
+          },
+        ]);
+        setChecking(false);
+        setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
+        setPending(false);
+        inputRef.current?.focus();
+        return;
+      } catch (caught) {
+        const failure =
+          caught instanceof ConciergeError ? caught : new ConciergeError("I couldn't send that. Send it again.", "unexpected");
 
-        try {
-          const reply = await sendConciergeMessage(message, historyOf(history), {
-            publicHotelId,
-            conversationId,
-            turnId: userId,
-          });
-          if (reply.conversationId) {
-            setThread({ conversationId: reply.conversationId, handledBy: reply.handledBy ?? "ai", after: afterRef.current });
-          }
-          setEntries((current) => [
-            ...current,
-            {
-              id: newId(),
-              role: "assistant",
-              text: reply.reply,
-              ...(reply.search ? { search: reply.search } : {}),
-              ...(reply.availability ? { availability: reply.availability } : {}),
-              ...(reply.quote ? { quote: reply.quote } : {}),
-              ...(reply.booking ? { booking: reply.booking } : {}),
-            },
-          ]);
-          setRetrying(null);
+        if (failure.conversationId) {
+          const id = failure.conversationId;
+          setThread((current) => ({ conversationId: id, handledBy: current?.handledBy ?? "ai", after: afterRef.current }));
+        }
+        if (failure.booking) {
+          // The reservation exists even though the reply didn't arrive: never hide it.
+          const booking = failure.booking;
+          setEntries((current) => [...current, { id: newId(), role: "assistant", text: "Your booking is confirmed.", booking }]);
+          toast.error("Booking confirmed — but the reply didn't arrive. Save your booking reference.");
           setChecking(false);
           setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
           setPending(false);
           inputRef.current?.focus();
           return;
-        } catch (caught) {
-          const failure =
-            caught instanceof ConciergeError ? caught : new ConciergeError("I couldn't send that. Send it again.", "unexpected");
-          lastError = failure;
-
-          if (failure.conversationId) {
-            const id = failure.conversationId;
-            setThread((current) => ({ conversationId: id, handledBy: current?.handledBy ?? "ai", after: afterRef.current }));
-          }
-          if (failure.booking) {
-            // The reservation exists even though the reply didn't arrive: never hide it.
-            const booking = failure.booking;
-            setEntries((current) => [...current, { id: newId(), role: "assistant", text: "Your booking is confirmed.", booking }]);
-            toast.error("Booking confirmed — but the reply didn't arrive. Save your booking reference.");
-            setRetrying(null);
-            setChecking(false);
-            setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
-            setPending(false);
-            inputRef.current?.focus();
-            return;
-          }
-          if (!failure.retryable || clientAttempt === maxClientRetries) {
-            // Exhausted: mark this guest turn failed and keep it in the thread.
-            setEntries((current) => current.map((e) => (e.id === userId ? { ...e, failed: true } : e)));
-            setError({ message: failure.message, ...(failure.retryable ? { retryText: message } : {}) });
-            setRetrying(null);
-            setChecking(false);
-            setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
-            setPending(false);
-            inputRef.current?.focus();
-            return;
-          }
-          // Retryable and attempts remain: loop retries the same message.
         }
-      }
-
-      // All client retries exhausted.
-      if (lastError) {
         setEntries((current) => current.map((e) => (e.id === userId ? { ...e, failed: true } : e)));
-        setError({ message: lastError.message, retryText: message });
+        setError({ message: failure.message, ...(failure.retryable ? { retryText: message } : {}) });
+        setChecking(false);
+        setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
+        setPending(false);
+        inputRef.current?.focus();
       }
-      setRetrying(null);
-      setChecking(false);
-      setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
-      setPending(false);
-      inputRef.current?.focus();
     },
     [entries, pending, publicHotelId, conversationId, toast]
   );
@@ -419,28 +387,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
                 </div>
               </div>
             )}
-            {retrying && (
-              <div className="flex gap-2.5 items-center" role="status" aria-live="polite">
-                <AssistantAvatar />
-                <div className="rounded-2xl rounded-tl-md px-4 py-3 flex items-center gap-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                  <span className="flex gap-1" aria-hidden>
-                    {[0, 1, 2].map((i) => (
-                      <motion.span
-                        key={i}
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: "var(--primary)" }}
-                        animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
-                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
-                      />
-                    ))}
-                  </span>
-                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    Busy right now, retrying… ({retrying.attempt} of {retrying.max})
-                  </span>
-                </div>
-              </div>
-            )}
-            {!checking && !retrying && pending && <TypingIndicator />}
+            {!checking && pending && <TypingIndicator />}
             {error && <ErrorNotice message={error.message} onRetry={error.retryText ? () => void send(error.retryText!, true) : undefined} />}
           </div>
 

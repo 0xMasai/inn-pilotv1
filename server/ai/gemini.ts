@@ -327,7 +327,7 @@ export async function checkHealth(
   const startedAt = Date.now();
   try {
     const config = resolveGeminiConfig(env);
-    const response = await callWithRetry(
+    const { response } = await callWithRetry(
       config,
       {
         system: "You are a connectivity check. Reply with the single word: ok.",

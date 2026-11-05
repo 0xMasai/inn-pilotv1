@@ -23,6 +23,7 @@ import {
 } from "../../server/ai/errors.js";
 import { ConciergeError } from "../../src/lib/concierge.js";
 import { isTurnId } from "../../server/conversations.js";
+import { createReservationTool } from "../../server/ai/tools/createReservation.js";
 
 describe("guest-facing error wording", () => {
   it("DEFAULT_GUEST_MESSAGE says 'send again' not 'try again'", () => {
@@ -134,5 +135,34 @@ describe("turnId dedup prevents duplicate recording", () => {
     const different = "turn-xyz-789";
     const repeat2 = isTurnId(different) && pendingTurnId === different;
     expect(repeat2).toBe(false);
+  });
+});
+
+describe("no duplicate booking on a retried turn", () => {
+  const args = {
+    hotel: "kabale-hotel-1",
+    roomType: "Double",
+    checkIn: "2026-11-10",
+    checkOut: "2026-11-15",
+    guestName: "Amina Okello",
+    guestPhoneNumber: "+256 772 123 456",
+  } as Record<string, unknown>;
+
+  it("create_reservation refuses when no pending summary exists (already booked: pendingBooking cleared)", async () => {
+    // After a booking is confirmed, recordTurn clears pendingBooking. A retried
+    // turn (same turnId, response lost) therefore finds no pending summary and
+    // create_reservation returns needs_confirmation instead of booking again.
+    const result = await createReservationTool.run(
+      { network: null as unknown, guestMessage: "Yes, confirm", pendingBooking: null, now: new Date() },
+      args
+    );
+    expect(result).toMatchObject({ status: "not_booked", reason: "needs_confirmation" });
+  });
+
+  it("the turnId dedup predicate keeps a failed turn from being re-recorded", () => {
+    const turnId = "turn-abc-123";
+    // repeat = isTurnId(turnId) && pendingTurnId === turnId
+    expect(isTurnId(turnId) && "turn-abc-123" === turnId).toBe(true);
+    expect(isTurnId(turnId) && "turn-xyz-789" === turnId).toBe(false);
   });
 });

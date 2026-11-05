@@ -44,12 +44,13 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-[100dvh] flex items-center justify-center px-5" style={{ background: "var(--app-bg)" }}>
           <div className="card p-8 max-w-md w-full text-center space-y-3">
             <span className="empty-icon mx-auto">⚠️</span>
-            <h1 className="font-poppins text-xl font-semibold">The concierge hit an error</h1>
+            <h1 className="font-poppins text-xl font-semibold">The concierge encountered an error</h1>
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              The concierge hit an error. Your earlier messages are still here — send again to continue.
+              Your earlier messages are preserved, and no booking was made or changed. Send again to continue,
+              or contact the hotel team directly if the problem persists.
             </p>
             <button type="button" className="btn btn-primary" onClick={this.reset}>
-              Try again
+              Send again
             </button>
           </div>
         </div>

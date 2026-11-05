@@ -128,6 +128,8 @@ export interface GuestTurn {
   /** Absent when the turn failed. */
   replyText?: string;
   replyRole?: MessageRole;
+  /** Total AI processing time for this turn, in milliseconds. Persisted minimally, per hotel. */
+  timingMs?: number;
   /** Hotels shown to the guest this turn. */
   attach?: HotelScope[];
   /** Hotels that showed the guest live availability this turn. */
@@ -145,6 +147,39 @@ export interface GuestTurn {
     guests: number;
     roomType: string;
   };
+}
+
+/** Minimal per-hotel timing aggregate, tenant-isolated on the canonical thread. */
+interface HotelTiming {
+  count: number;
+  totalMs: number;
+  lastAt: number;
+}
+
+type TimingsMap = Record<string, HotelTiming>;
+
+function mergeTimings(
+  existing: unknown,
+  attach: HotelScope[] | undefined,
+  selected: HotelScope | undefined,
+  bookedScope: HotelScope | undefined,
+  timingMs: number,
+  now: number
+): TimingsMap {
+  const map: TimingsMap = typeof existing === "object" && existing !== null ? (existing as TimingsMap) : {};
+  const hotels = new Set<string>();
+  for (const scope of [...(attach ?? []), selected, bookedScope]) {
+    if (scope) hotels.add(scope.hotelId);
+  }
+  for (const hotelId of hotels) {
+    const prev = map[hotelId] ?? { count: 0, totalMs: 0, lastAt: 0 };
+    map[hotelId] = {
+      count: prev.count + 1,
+      totalMs: prev.totalMs + timingMs,
+      lastAt: now,
+    };
+  }
+  return map;
 }
 
 /**
@@ -200,6 +235,7 @@ export async function recordGuestTurn(thread: GuestThread, turn: GuestTurn): Pro
       pendingTurnId: !turn.replyText && isTurnId(turn.turnId) ? turn.turnId : "",
       updatedAt: new Date(now),
       ...(turn.pendingBooking !== undefined ? { pendingBooking: turn.pendingBooking } : {}),
+      ...(typeof turn.timingMs === "number" ? { timings: mergeTimings(data?.timings, turn.attach, turn.selected, turn.booking?.scope, turn.timingMs, now) } : {}),
     };
     if (snap.exists) tx.update(thread.ref, summary);
     else tx.create(thread.ref, { ...summary, scope: thread.scope, createdAt: new Date(receivedAt) });

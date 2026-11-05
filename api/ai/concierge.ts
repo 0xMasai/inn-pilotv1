@@ -309,9 +309,10 @@ class TurnOutcome {
   }
 
   /** The conversation record for this turn. */
-  record(base: Pick<GuestTurn, "guestText" | "receivedAt" | "turnId" | "replyText">): GuestTurn {
+  record(base: Pick<GuestTurn, "guestText" | "receivedAt" | "turnId" | "replyText">, timingMs?: number): GuestTurn {
     return {
       ...base,
+      ...(typeof timingMs === "number" ? { timingMs } : {}),
       attach: [...this.attach.values()],
       quotedHotelIds: this.quotedHotelIds,
       ...(this.selected ? { selected: this.selected } : {}),
@@ -449,9 +450,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // The guest already has their answer (and maybe a booking): a record that
     // fails to write is logged, never turned into a failed reply.
+    const turnTiming = timingOf(startedAt, resolveMs, trace);
     await recordGuestTurn(
       openThread,
-      turn.record({ guestText: message, receivedAt: startedAt, turnId, replyText: generation.text })
+      turn.record({ guestText: message, receivedAt: startedAt, turnId, replyText: generation.text }, turnTiming.totalMs)
     ).catch((error: unknown) =>
       console.error("[concierge] conversation write failed", { requestId, conversationId: openThread.id, detail: errorMessage(error) })
     );
@@ -479,7 +481,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       ...(turn.booking ? { reservationId: turn.booking.reservationId } : {}),
       inputTokens: generation.usage.inputTokens,
       outputTokens: generation.usage.outputTokens,
-      timing: timingOf(startedAt, resolveMs, trace),
+      timing: turnTiming,
     });
 
     sendJson(res, 200, reply);

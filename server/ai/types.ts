@@ -32,6 +32,8 @@ export interface AiGeneration {
   usage: AiUsage;
   /** Names of the tools run to produce this reply, in order. */
   toolCalls?: string[];
+  /** How many provider retries happened inside this turn (0 = none). */
+  retryAttempt?: number;
 }
 
 /**
@@ -238,6 +240,8 @@ export interface ConciergeReply {
   conversationId?: string;
   /** "human" when staff have taken the conversation over and the AI is not replying. */
   handledBy?: "ai" | "human";
+  /** How many provider retries happened inside this turn (0 = none). */
+  retryAttempt?: number;
 }
 
 /** GET /api/ai/hotel: one hotel's public header, for its own concierge link. No hotelId, ever. */

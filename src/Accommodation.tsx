@@ -80,6 +80,8 @@ interface Booking {
   paymentStatus: "Paid" | "Pending";
   notes?: string;
   status?: BookingStatus;
+  /** Where the booking came from. AI concierge bookings carry "concierge". */
+  source?: string;
   /** Legacy flag kept in sync for older screens. */
   isOccupied?: boolean;
 }
@@ -179,6 +181,7 @@ export default function AccommodationDashboard() {
   const [filterType, setFilterType] = useState<string>("All");
   const [filterPayment, setFilterPayment] = useState<"All" | "Paid" | "Pending">("All");
   const [filterStatus, setFilterStatus] = useState<string>("All");
+  const [filterSource, setFilterSource] = useState<"All" | "concierge">("All");
 
   // Shared operational data: all staff at this hotel see all its bookings and rooms.
   useEffect(() => {
@@ -486,10 +489,11 @@ export default function AccommodationDashboard() {
         const matchesType = filterType === "All" ? true : b.roomType === filterType;
         const matchesPayment = filterPayment === "All" ? true : b.paymentStatus === filterPayment;
         const matchesStatus = filterStatus === "All" ? true : bookingStatus(b) === filterStatus;
-        return matchesSearch && matchesType && matchesPayment && matchesStatus;
+        const matchesSource = filterSource === "All" ? true : b.source === filterSource;
+        return matchesSearch && matchesType && matchesPayment && matchesStatus && matchesSource;
       })
       .sort((a, b) => (toDate(b.checkIn)?.getTime() ?? 0) - (toDate(a.checkIn)?.getTime() ?? 0));
-  }, [bookings, search, filterType, filterPayment, filterStatus]);
+  }, [bookings, search, filterType, filterPayment, filterStatus, filterSource]);
 
   const printBooking = (b: Booking) => {
     const win = window.open("", "PRINT", "height=650,width=450");
@@ -1055,6 +1059,7 @@ export default function AccommodationDashboard() {
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="select" aria-label="Room type"><option value="All">All room types</option>{ROOM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
             <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value as "All" | "Paid" | "Pending")} className="select" aria-label="Payment status"><option value="All">All payments</option><option value="Paid">Paid</option><option value="Pending">Pending</option></select>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="select" aria-label="Reservation status"><option value="All">All statuses</option><option value="Confirmed">Confirmed</option><option value="Checked In">Checked In</option><option value="Checked Out">Checked Out</option><option value="Cancelled">Cancelled</option><option value="No Show">No Show</option></select>
+            <select value={filterSource} onChange={(e) => setFilterSource(e.target.value as "All" | "concierge")} className="select" aria-label="Booking source"><option value="All">All sources</option><option value="concierge">AI bookings</option></select>
           </div>
         </div>
         <p className="mt-3 text-sm muted">Showing <strong className="text-slate-700">{filteredBookings.length}</strong> of <strong className="text-slate-700">{bookings.length}</strong> reservations</p>
@@ -1092,7 +1097,7 @@ export default function AccommodationDashboard() {
                       <td className="text-slate-500 whitespace-nowrap"><div>{formatDateShort(b.checkIn)} → {formatDateShort(b.checkOut)}</div><div className="text-xs">{b.numberOfGuests ?? 1} guest(s)</div></td>
                       <td className="num font-medium">{b.pricePaid ? money(b.pricePaid, currency) : "—"}</td>
                       <td><span className={`badge ${b.paymentStatus === "Paid" ? "badge-success" : "badge-warning"}`}>{b.paymentStatus}</span></td>
-                      <td><span className={`badge ${statusBadge[st]}`}>{st}</span></td>
+                      <td><span className={`badge ${statusBadge[st]}`}>{st}</span>{b.source === "concierge" && <span className="badge badge-info">AI</span>}</td>
                       <td>
                         <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                           <button onClick={() => setSelectedBooking(b)} className="btn btn-ghost btn-sm" title="View reservation"><Eye size={14} /></button>

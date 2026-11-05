@@ -13,9 +13,10 @@
  * Vercel environment change, not a deploy of different code. Adding one
  * (e.g. a local Ollama for development) is a new module plus an entry here.
  */
-import { resolveProviderName, type AiProviderName, type Env } from "./config.js";
+import { resolveFallbackProvider, resolveProviderName, type AiProviderName, type Env } from "./config.js";
 import * as gemini from "./gemini.js";
 import * as groq from "./groq.js";
+import { isRateLimitError } from "./errors.js";
 import type { AiGeneration, AiHealthReport, GenerateInput } from "./types.js";
 
 export interface AiProvider {
@@ -30,9 +31,56 @@ export function providerFor(env: Env = process.env): { name: AiProviderName; pro
   return { name, provider: PROVIDERS[name] };
 }
 
-/** One guest turn through the configured provider. Throws AiError subclasses only. */
+/** One guest turn through the configured provider. If the primary is rate-limited
+ * and a fallback provider is configured, the fallback gets one attempt (it has its
+ * own rate-limit bucket). Throws AiError subclasses only. */
 export function generate(input: GenerateInput): Promise<AiGeneration> {
-  return providerFor(input.env ?? process.env).provider.generate(input);
+  const env = input.env ?? process.env;
+  const { name, provider } = providerFor(env);
+  return generateWithFallback(name, provider, input, env);
+}
+
+async function generateWithFallback(
+  primaryName: AiProviderName,
+  primaryProvider: AiProvider,
+  input: GenerateInput,
+  env: Env,
+): Promise<AiGeneration> {
+  try {
+    return await primaryProvider.generate(input);
+  } catch (error) {
+    if (!isRateLimited(error)) throw error;
+    const fallback = resolveFallbackProvider(env);
+    if (!fallback) throw error;
+    // Don't fall back to the same provider.
+    if (fallback.provider === primaryName) throw error;
+    const fallbackProvider = PROVIDERS[fallback.provider];
+    const fallbackInput: GenerateInput = {
+      ...input,
+      env: {
+        ...env,
+        ...(fallback.provider === "groq"
+          ? { GROQ_MODEL: fallback.model }
+          : { GEMINI_MODEL: fallback.model }),
+      },
+    };
+    console.warn("[provider] primary rate-limited, trying fallback", {
+      primary: primaryName,
+      fallback: fallback.provider,
+      fallbackModel: fallback.model,
+    });
+    return await fallbackProvider.generate(fallbackInput);
+  }
+}
+
+/** True when the primary provider is rate-limited and a fallback may help.
+ * Covers both the gateway's own AiRateLimitError and provider 429s that
+ * providers wrap as AiUnavailableError/GroqCallError with HTTP 429. */
+function isRateLimited(error: unknown): boolean {
+  if (isRateLimitError(error)) return true;
+  // Groq wraps 429s as GroqCallError (extends AiUnavailableError) with httpStatus 429.
+  const groqErr = error as { httpStatus?: number } | undefined;
+  return groqErr?.httpStatus === 429;
 }
 
 /** The configured provider's health, labelled with which provider it is. */

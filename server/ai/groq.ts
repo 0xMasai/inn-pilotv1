@@ -45,8 +45,10 @@ import type { AiGeneration, AiHealthReport, AiMessage, AiToolResult, GenerateInp
  * one wait of up to 10s (never past the turn deadline) beats failing it.
  */
 export const MAX_RATE_LIMIT_WAIT_MS = 10_000;
-/** Pause before the single retry of a transient failure. */
-const RETRY_PAUSE_MS = 400;
+/** Pause before the first retry of a transient failure. Doubles each attempt. */
+export const RETRY_BASE_PAUSE_MS = 400;
+/** Maximum number of call attempts (original + retries) within one turn. */
+export const MAX_CALL_ATTEMPTS = 3;
 
 /* ------------------------------------------------------------------ */
 /* Wire shapes: the OpenAI-compatible subset of the API this module uses */
@@ -239,20 +241,29 @@ async function callOnce(config: GroqConfig, input: GenerateInput, messages: Mess
   }
 }
 
-async function callWithRetry(config: GroqConfig, input: GenerateInput, messages: Message[], deadline: number): Promise<Completion> {
-  try {
-    return await callOnce(config, input, messages, deadline);
-  } catch (error) {
-    const aiError = asAiError(error);
-    if (!(aiError instanceof GroqCallError) || !aiError.retryable) throw aiError;
+async function callWithRetry(config: GroqConfig, input: GenerateInput, messages: Message[], deadline: number): Promise<{ completion: Completion; retryAttempt: number }> {
+  let lastError: AiError | null = null;
+  let retryAttempt = 0;
+  for (let attempt = 0; attempt < MAX_CALL_ATTEMPTS; attempt++) {
+    try {
+      return { completion: await callOnce(config, input, messages, deadline), retryAttempt };
+    } catch (error) {
+      const aiError = asAiError(error);
+      lastError = aiError;
+      if (!(aiError instanceof GroqCallError) || !aiError.retryable) throw aiError;
 
-    const pause = Math.max(RETRY_PAUSE_MS, aiError.retryAfterMs ?? 0);
-    // Not enough of the turn left to wait and try again: fail now, honestly.
-    if (Date.now() + pause >= deadline) throw aiError;
-    console.warn("[groq] retrying once", { detail: aiError.message, pauseMs: pause });
-    await new Promise((resolve) => setTimeout(resolve, pause));
-    return callOnce(config, input, messages, deadline);
+      retryAttempt = attempt + 1;
+      const pause = Math.min(
+        Math.max(aiError.retryAfterMs ?? 0, RETRY_BASE_PAUSE_MS * 2 ** attempt),
+        MAX_RATE_LIMIT_WAIT_MS,
+      );
+      // Not enough of the turn left to wait and try again: fail now, honestly.
+      if (Date.now() + pause >= deadline) throw aiError;
+      console.warn("[groq] retrying", { attempt: attempt + 1, detail: aiError.message, pauseMs: pause });
+      await new Promise((resolve) => setTimeout(resolve, pause));
+    }
   }
+  throw lastError ?? new AiUnavailableError("Groq call failed after retries.");
 }
 
 /** The tool arguments as an object, or a failure: the model's JSON is untrusted input. */
@@ -299,8 +310,11 @@ export async function generate(input: GenerateInput): Promise<AiGeneration> {
   for (let round = 0; ; round++) {
     const callStarted = Date.now();
     let completion: Completion;
+    let retryAttempt = 0;
     try {
-      completion = await callWithRetry(config, input, messages, deadline);
+      const result = await callWithRetry(config, input, messages, deadline);
+      completion = result.completion;
+      retryAttempt = result.retryAttempt;
     } catch (error) {
       input.trace?.modelCalls.push({ ms: Date.now() - callStarted, failed: asAiError(error).code });
       throw asAiError(error);
@@ -331,7 +345,7 @@ export async function generate(input: GenerateInput): Promise<AiGeneration> {
       if (!text) {
         throw new AiUnavailableError(`Groq returned no usable text (finish_reason: ${choice.finish_reason ?? "unknown"}).`);
       }
-      return { text, model: config.model, usage, toolCalls };
+      return { text, model: config.model, usage, toolCalls, retryAttempt };
     }
 
     if (round >= MAX_TOOL_ROUNDS) {

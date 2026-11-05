@@ -57,8 +57,7 @@ export function createToolbox(context: ToolContext, requestId = ""): Toolbox {
         return {
           error: "tool_failed",
           message:
-            "The hotel system couldn't be reached, so nothing was checked or booked. Tell the guest you can't confirm " +
-            "this right now and ask them to try again in a moment.",
+            "The hotel system couldn't be reached, so nothing was checked or booked. Tell the guest nothing was confirmed, and to send again in a moment.",
         };
       }
     },

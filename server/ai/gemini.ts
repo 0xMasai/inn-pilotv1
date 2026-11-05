@@ -193,17 +193,19 @@ async function callWithRetry(
   input: GenerateInput,
   contents: Content[],
   deadline: number
-): Promise<GenerateContentResponse> {
+): Promise<{ response: GenerateContentResponse; retryAttempt: number }> {
+  let retryAttempt = 0;
   try {
-    return await callOnce(config, input, contents, deadline);
+    return { response: await callOnce(config, input, contents, deadline), retryAttempt };
   } catch (error) {
     const aiError = asAiError(error);
     if (!isRetryable(aiError)) throw aiError;
 
+    retryAttempt = 1;
     // One retry, after a short pause. A second failure is a real outage,
     // and making a guest wait through a third attempt helps nobody.
     await new Promise((resolve) => setTimeout(resolve, 400));
-    return callOnce(config, input, contents, deadline);
+    return { response: await callOnce(config, input, contents, deadline), retryAttempt };
   }
 }
 
@@ -236,8 +238,11 @@ export async function generate(input: GenerateInput): Promise<AiGeneration> {
   for (let round = 0; ; round++) {
     const callStarted = Date.now();
     let response: GenerateContentResponse;
+    let retryAttempt = 0;
     try {
-      response = await callWithRetry(config, input, contents, deadline);
+      const result = await callWithRetry(config, input, contents, deadline);
+      response = result.response;
+      retryAttempt = result.retryAttempt;
     } catch (error) {
       input.trace?.modelCalls.push({ ms: Date.now() - callStarted, failed: asAiError(error).code });
       throw error;
@@ -265,7 +270,7 @@ export async function generate(input: GenerateInput): Promise<AiGeneration> {
           }).`
         );
       }
-      return { text, model: config.model, usage, toolCalls };
+      return { text, model: config.model, usage, toolCalls, retryAttempt };
     }
 
     if (round >= MAX_TOOL_ROUNDS) {
@@ -322,7 +327,7 @@ export async function checkHealth(
   const startedAt = Date.now();
   try {
     const config = resolveGeminiConfig(env);
-    const response = await callWithRetry(
+    const { response } = await callWithRetry(
       config,
       {
         system: "You are a connectivity check. Reply with the single word: ok.",

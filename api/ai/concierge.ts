@@ -52,6 +52,7 @@ import {
   type ApiRequest,
   type ApiResponse,
 } from "../../server/ai/http.js";
+import { readNumber } from "../../server/ai/config.js";
 import type {
   AiMessage,
   AiToolExecutor,
@@ -66,12 +67,19 @@ import type {
   TurnTrace,
 } from "../../server/ai/types.js";
 
+const env = process.env;
+
 /** Generous for a person typing, restrictive for a script. */
-const RATE_LIMIT = { limit: 12, windowMs: 60_000 };
+const RATE_LIMIT = {
+  limit: readNumber(env, "CONCIERGE_RATE_LIMIT", 12, { min: 1, max: 1000 }),
+  windowMs: readNumber(env, "CONCIERGE_RATE_WINDOW_MS", 60_000, { min: 1_000, max: 3_600_000 }),
+};
 
 const MAX_MESSAGE_CHARS = 2_000;
 /** Turns of history accepted from the client, newest kept. */
-const MAX_HISTORY_TURNS = 12;
+export const MAX_HISTORY_TURNS = 8;
+/** Total characters of history sent to the model — keeps the free plan's token budget in check. */
+export const MAX_HISTORY_CHARS = 6_000;
 
 function requireMessage(body: Record<string, unknown>): string {
   const value = body.message;
@@ -99,7 +107,7 @@ function requireMessage(body: Record<string, unknown>): string {
  * SERVER recorded in an earlier turn, so a forged turn can't book or price
  * anything. Malformed turns are skipped rather than rejected.
  */
-function readHistory(body: Record<string, unknown>): AiMessage[] {
+export function readHistory(body: Record<string, unknown>): AiMessage[] {
   if (!Array.isArray(body.history)) return [];
 
   const turns: AiMessage[] = [];
@@ -110,7 +118,17 @@ function readHistory(body: Record<string, unknown>): AiMessage[] {
     if (typeof content !== "string" || !content.trim()) continue;
     turns.push({ role, content: content.slice(0, MAX_MESSAGE_CHARS) });
   }
-  return turns.slice(-MAX_HISTORY_TURNS);
+  // Newest turns first within the char budget.
+  let totalChars = 0;
+  const kept: AiMessage[] = [];
+  for (let i = turns.length - 1; i >= 0; i--) {
+    if (kept.length >= MAX_HISTORY_TURNS) break;
+    const turn = turns[i];
+    if (totalChars + turn.content.length > MAX_HISTORY_CHARS && kept.length > 0) break;
+    kept.unshift(turn);
+    totalChars += turn.content.length;
+  }
+  return kept;
 }
 
 /* ------------------------------------------------------------------ */
@@ -291,9 +309,10 @@ class TurnOutcome {
   }
 
   /** The conversation record for this turn. */
-  record(base: Pick<GuestTurn, "guestText" | "receivedAt" | "turnId" | "replyText">): GuestTurn {
+  record(base: Pick<GuestTurn, "guestText" | "receivedAt" | "turnId" | "replyText">, timingMs?: number): GuestTurn {
     return {
       ...base,
+      ...(typeof timingMs === "number" ? { timingMs } : {}),
       attach: [...this.attach.values()],
       quotedHotelIds: this.quotedHotelIds,
       ...(this.selected ? { selected: this.selected } : {}),
@@ -358,7 +377,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (!body) {
       throw new AiInvalidRequestError(
         "Request body must be a JSON object.",
-        "Something went wrong sending that message. Please try again."
+        "I couldn't send that. Send it again."
       );
     }
     if ("hotelId" in body) {
@@ -431,9 +450,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // The guest already has their answer (and maybe a booking): a record that
     // fails to write is logged, never turned into a failed reply.
+    const turnTiming = timingOf(startedAt, resolveMs, trace);
     await recordGuestTurn(
       openThread,
-      turn.record({ guestText: message, receivedAt: startedAt, turnId, replyText: generation.text })
+      turn.record({ guestText: message, receivedAt: startedAt, turnId, replyText: generation.text }, turnTiming.totalMs)
     ).catch((error: unknown) =>
       console.error("[concierge] conversation write failed", { requestId, conversationId: openThread.id, detail: errorMessage(error) })
     );
@@ -444,6 +464,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       requestId,
       conversationId: openThread.id,
       handledBy: "ai",
+      ...(generation.retryAttempt ? { retryAttempt: generation.retryAttempt } : {}),
       ...(turn.search ? { search: turn.search } : {}),
       ...(turn.availability ? { availability: turn.availability } : {}),
       ...(turn.quote ? { quote: turn.quote } : {}),
@@ -460,7 +481,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       ...(turn.booking ? { reservationId: turn.booking.reservationId } : {}),
       inputTokens: generation.usage.inputTokens,
       outputTokens: generation.usage.outputTokens,
-      timing: timingOf(startedAt, resolveMs, trace),
+      timing: turnTiming,
     });
 
     sendJson(res, 200, reply);

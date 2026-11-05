@@ -35,6 +35,19 @@ export interface NetworkContext {
 
 const nameKey = (value: string) => value.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 
+/** In-memory cache for the network hotel list: avoids re-fetching all hotel profiles every turn. */
+interface CachedHotels {
+  hotels: HotelScope[];
+  fetchedAt: number;
+}
+const NETWORK_CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+let networkCache: CachedHotels | null = null;
+
+/** Test seam: forgets the cached network hotel list. */
+export function resetNetworkCache(): void {
+  networkCache = null;
+}
+
 /** The one hotel among `hotels` a reference names: by public id, else by a unique exact name. */
 export function findHotel(hotels: HotelScope[], reference: unknown): HotelScope | null {
   if (typeof reference !== "string" || !reference.trim() || reference.length > 120) return null;
@@ -61,7 +74,19 @@ export async function createNetworkContext(scopedPublicId?: unknown): Promise<Ne
   }
 
   let listed: Promise<HotelScope[]> | null = null;
-  const hotels = () => (listed ??= listNetworkHotels());
+  const hotels = () => {
+    if (listed) return listed;
+    const now = Date.now();
+    if (networkCache && now - networkCache.fetchedAt < NETWORK_CACHE_TTL_MS) {
+      listed = Promise.resolve(networkCache.hotels);
+      return listed;
+    }
+    listed = listNetworkHotels().then((hotels) => {
+      networkCache = { hotels, fetchedAt: now };
+      return hotels;
+    });
+    return listed;
+  };
   return {
     scopedPublicId: null,
     searchableHotels: hotels,

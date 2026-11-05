@@ -11,10 +11,10 @@
  * only one would silently under-report any hotel that used the other.
  */
 import { useEffect, useMemo, useState } from "react";
-import { onSnapshot } from "firebase/firestore";
+import { onSnapshot, orderBy, query, limit } from "firebase/firestore";
 import { COLLECTIONS } from "./collections";
 import { hotelCollection } from "./hotelScope";
-import { emptyMetricsInput, type MetricsInput } from "./metrics";
+import { emptyMetricsInput, type MetricsInput, type ConversationBrief, toDateSafe } from "./metrics";
 
 export interface HotelDataState {
   data: MetricsInput;
@@ -27,7 +27,8 @@ export function useHotelData(hotelId: string | null): HotelDataState {
   const [core, setCore] = useState<MetricsInput>(emptyMetricsInput);
   const [legacyBookings, setLegacyBookings] = useState<MetricsInput["bookings"]>([]);
   const [reservations, setReservations] = useState<MetricsInput["bookings"]>([]);
-  const [pending, setPending] = useState(7);
+  const [conversations, setConversations] = useState<MetricsInput["conversations"]>([]);
+  const [pending, setPending] = useState(8);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +37,8 @@ export function useHotelData(hotelId: string | null): HotelDataState {
     setCore(emptyMetricsInput);
     setLegacyBookings([]);
     setReservations([]);
-    setPending(7);
+    setConversations([]);
+    setPending(8);
     setError(null);
 
     // Each listener resolves its own slice of the loading count, so the
@@ -118,6 +120,33 @@ export function useHotelData(hotelId: string | null): HotelDataState {
         (s) => setCore((p) => ({ ...p, rooms: s.docs.map((d) => d.data() as MetricsInput["rooms"][number]) })),
         onError("rooms")
       ),
+      onSnapshot(
+        query(hotelCollection(hotelId, COLLECTIONS.CONVERSATIONS), orderBy("updatedAt", "desc"), limit(200)),
+        (s) => {
+          setConversations(
+            s.docs.map((d) => {
+              const data = d.data();
+              return {
+                bookingStatus: (() => {
+                  const v = data.bookingStatus;
+                  return v === "none" || v === "quoted" || v === "booked" ? v : "none";
+                })(),
+                lastMessage:
+                  data.lastMessage && typeof data.lastMessage.at !== "undefined"
+                    ? {
+                        role: typeof data.lastMessage.role === "string" ? data.lastMessage.role : "guest",
+                        at: toDateSafe(data.lastMessage.at) ?? new Date(0),
+                      }
+                    : null,
+                lastGuestAt: toDateSafe(data.lastGuestAt) ?? null,
+                createdAt: toDateSafe(data.createdAt) ?? null,
+              } as ConversationBrief;
+            })
+          );
+          settle("conversations");
+        },
+        onError("conversations")
+      ),
     ];
 
     return () => {
@@ -127,8 +156,8 @@ export function useHotelData(hotelId: string | null): HotelDataState {
   }, [hotelId]);
 
   const data = useMemo<MetricsInput>(
-    () => ({ ...core, bookings: [...legacyBookings, ...reservations] }),
-    [core, legacyBookings, reservations]
+    () => ({ ...core, bookings: [...legacyBookings, ...reservations], conversations }),
+    [core, legacyBookings, reservations, conversations]
   );
 
   return { data, loading: pending > 0, error };

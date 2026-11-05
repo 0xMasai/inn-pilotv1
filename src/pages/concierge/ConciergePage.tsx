@@ -24,6 +24,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
+  AlertCircle,
   ArrowRight,
   ArrowUp,
   BadgeCheck,
@@ -33,13 +34,14 @@ import {
   MapPin,
   MessageSquarePlus,
   MessagesSquare,
-  SearchX,
   ShieldCheck,
   Sparkles,
+  WifiOff,
   Zap,
 } from "lucide-react";
 
 import innpilotMark from "../../assets/brand/innpilot-mark.png";
+import { useToast } from "../../components/ui";
 import {
   clearConversation,
   ConciergeError,
@@ -63,6 +65,7 @@ import {
 import { money } from "../../lib/format";
 import { isPublicHotelId } from "../../lib/publicHotel";
 import { AssistantAvatar, ErrorNotice, MessageBubble, TypingIndicator, type EntryActions } from "./parts";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 const newId = () => Math.random().toString(36).slice(2, 11);
 
@@ -92,7 +95,7 @@ const hotelSuggestions = (name: string) => [
 
 export default function ConciergePage() {
   const { publicHotelId } = useParams();
-  if (publicHotelId === undefined) return <Concierge />;
+  if (publicHotelId === undefined) return <ErrorBoundary><Concierge /></ErrorBoundary>;
   return <HotelConcierge publicHotelId={publicHotelId} />;
 }
 
@@ -121,7 +124,7 @@ function HotelConcierge({ publicHotelId }: { publicHotelId: string }) {
       .then((hotel) => setState({ status: "ready", hotel }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        const message = error instanceof Error ? error.message : "Something went wrong.";
+        const message = error instanceof Error ? error.message : "I couldn't load this hotel. Send again.";
         setState(error instanceof ConciergeError && !error.retryable ? { status: "not-found" } : { status: "error", message });
       });
     return () => controller.abort();
@@ -130,7 +133,11 @@ function HotelConcierge({ publicHotelId }: { publicHotelId: string }) {
   if (state.status === "loading") return <LoadingScreen />;
   if (state.status === "not-found") return <NotFoundScreen />;
   if (state.status === "error") return <LoadErrorScreen message={state.message} onRetry={() => setReloadKey((k) => k + 1)} />;
-  return <Concierge hotel={state.hotel} />;
+  return (
+    <ErrorBoundary>
+      <Concierge hotel={state.hotel} />
+    </ErrorBoundary>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -144,15 +151,33 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ message: string; retryText?: string } | null>(null);
   const [thread, setThread] = useState<ThreadState | null>(() => loadThread(publicHotelId));
+  const [sending, setSending] = useState<Set<string>>(new Set());
+  const [pollError, setPollError] = useState(false);
+  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [checking, setChecking] = useState(false);
+  const [searchDestination, setSearchDestination] = useState<string | null>(null);
   const afterRef = useRef(thread?.after ?? 0);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
     document.title = hotel ? `${hotel.name} · InnPilot AI Concierge` : "InnPilot AI Concierge · Find your stay with AI";
   }, [hotel]);
   useEffect(() => saveConversation(publicHotelId, entries), [publicHotelId, entries]);
   useEffect(() => saveThread(publicHotelId, thread), [publicHotelId, thread]);
+
+  // Online/offline detection so the guest isn't left wondering why nothing sends.
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   const conversationId = thread?.conversationId;
   const staffHandling = thread?.handledBy === "human";
@@ -168,6 +193,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
         const since = Math.max(0, afterRef.current - POLL_OVERLAP_MS);
         const update = await fetchThreadUpdates(conversationId, since, publicHotelId);
         if (cancelled) return;
+        setPollError(false);
         setEntries((current) => {
           const fresh = newStaffEntries(update, current, since).entries;
           return fresh.length ? [...current, ...fresh] : current;
@@ -180,6 +206,8 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
         if (caught instanceof ConciergeError && !caught.retryable) {
           afterRef.current = 0;
           setThread(null);
+        } else {
+          setPollError(true);
         }
       }
     };
@@ -193,16 +221,16 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [entries, pending, error]);
+  }, [entries, pending, error, sending, checking]);
 
   /** One guest turn. `retrying` resends the last undelivered message instead of adding one. */
   const send = useCallback(
-    async (text: string, retrying = false) => {
+    async (text: string, manualRetry = false) => {
       const message = text.trim();
       if (!message || pending) return;
 
       let failedIndex = -1;
-      if (retrying) {
+      if (manualRetry) {
         for (let i = entries.length - 1; i >= 0; i--) {
           if (entries[i].role === "user" && entries[i].failed) {
             failedIndex = i;
@@ -220,9 +248,16 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
       setDraft("");
       setError(null);
       setPending(true);
+      setChecking(true);
+      setSearchDestination(null);
+      setSending((current) => new Set([...current, userId]));
 
       try {
-        const reply = await sendConciergeMessage(message, historyOf(history), { publicHotelId, conversationId, turnId: userId });
+        const reply = await sendConciergeMessage(message, historyOf(history), {
+          publicHotelId,
+          conversationId,
+          turnId: userId,
+        });
         if (reply.conversationId) {
           setThread({ conversationId: reply.conversationId, handledBy: reply.handledBy ?? "ai", after: afterRef.current });
         }
@@ -238,9 +273,16 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             ...(reply.booking ? { booking: reply.booking } : {}),
           },
         ]);
+        setSearchDestination(reply.search?.destination ?? null);
+        setChecking(false);
+        setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
+        setPending(false);
+        inputRef.current?.focus();
+        return;
       } catch (caught) {
         const failure =
-          caught instanceof ConciergeError ? caught : new ConciergeError("Something went wrong sending that message. Please try again.", "unexpected");
+          caught instanceof ConciergeError ? caught : new ConciergeError("I couldn't send that. Send it again.", "unexpected");
+
         if (failure.conversationId) {
           const id = failure.conversationId;
           setThread((current) => ({ conversationId: id, handledBy: current?.handledBy ?? "ai", after: afterRef.current }));
@@ -249,16 +291,22 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
           // The reservation exists even though the reply didn't arrive: never hide it.
           const booking = failure.booking;
           setEntries((current) => [...current, { id: newId(), role: "assistant", text: "Your booking is confirmed.", booking }]);
-        } else {
-          setEntries((current) => current.map((e) => (e.id === userId ? { ...e, failed: true } : e)));
-          setError({ message: failure.message, ...(failure.retryable ? { retryText: message } : {}) });
+          toast.error("Booking confirmed — but the reply didn't arrive. Save your booking reference.");
+          setChecking(false);
+          setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
+          setPending(false);
+          inputRef.current?.focus();
+          return;
         }
-      } finally {
+        setEntries((current) => current.map((e) => (e.id === userId ? { ...e, failed: true } : e)));
+        setError({ message: failure.message, ...(failure.retryable ? { retryText: message } : {}) });
+        setChecking(false);
+        setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
         setPending(false);
         inputRef.current?.focus();
       }
     },
-    [entries, pending, publicHotelId, conversationId]
+    [entries, pending, publicHotelId, conversationId, toast]
   );
 
   const startOver = () => {
@@ -307,10 +355,41 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
       ) : (
         <main className="flex-1 flex flex-col w-full max-w-3xl mx-auto min-h-0">
           <div ref={listRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-5" aria-live="polite">
+            {!online && (
+              <div className="rounded-xl px-3 py-2 text-sm flex items-center gap-2" style={{ background: "var(--warning-soft)", color: "var(--warning-text)", border: "1px solid var(--warning-border)" }}>
+                <WifiOff size={14} /> You appear to be offline. Messages will send when you reconnect.
+              </div>
+            )}
+            {pollError && (
+              <div className="rounded-xl px-3 py-2 text-sm flex items-center gap-2" style={{ background: "var(--warning-soft)", color: "var(--warning-text)", border: "1px solid var(--warning-border)" }}>
+                <AlertCircle size={14} /> We're having trouble checking for new replies. Send a message.
+              </div>
+            )}
             {entries.map((entry) => (
-              <MessageBubble key={entry.id} entry={entry} actions={actions} />
+              <MessageBubble key={entry.id} entry={entry} actions={actions} sending={sending} />
             ))}
-            {pending && <TypingIndicator />}
+            {checking && (
+              <div className="flex gap-2.5 items-center" role="status" aria-live="polite">
+                <AssistantAvatar />
+                <div className="rounded-2xl rounded-tl-md px-4 py-3 flex items-center gap-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+                  <span className="flex gap-1" aria-hidden>
+                    {[0, 1, 2].map((i) => (
+                      <motion.span
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: "var(--primary)" }}
+                        animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+                      />
+                    ))}
+                  </span>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    {searchDestination ? `Checking availability in ${searchDestination}…` : "Checking availability…"}
+                  </span>
+                </div>
+              </div>
+            )}
+            {!checking && pending && <TypingIndicator />}
             {error && <ErrorNotice message={error.message} onRetry={error.retryText ? () => void send(error.retryText!, true) : undefined} />}
           </div>
 
@@ -329,7 +408,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             )}
             {composer}
             <p className="text-[11px] muted mt-1.5 text-center">
-              Rooms, prices and bookings come live from {hotel ? hotel.name : "K Hotels"}' booking systems.
+              Rooms, prices and bookings come live from {hotel ? hotel.name : "participating hotels"}' booking systems.
             </p>
           </div>
         </main>
@@ -477,7 +556,7 @@ function Home({
               style={{ background: "rgba(45,212,200,0.14)", color: "var(--brand-cyan)", border: "1px solid rgba(45,212,200,0.3)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--brand-cyan)" }} />
-              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "K Hotels · live rooms and prices"}
+              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "InnPilot · live rooms and prices"}
             </p>
             <h1 className="font-poppins font-semibold text-white mt-5 text-4xl sm:text-6xl leading-[1.05] tracking-tight">
               {hotel ? (
@@ -493,7 +572,7 @@ function Home({
             <p className="mt-4 text-base sm:text-lg max-w-2xl" style={{ color: "var(--rail-text)" }}>
               {hotel
                 ? "Tell me when you'd like to stay. I'll check live availability, show you real prices and book your room in this chat."
-                : "Search available K Hotels with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
+                : "Search available properties with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
             </p>
           </motion.div>
 
@@ -546,6 +625,7 @@ function Home({
 
 function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
   const [hotels, setHotels] = useState<NetworkHotel[] | null>(null);
+  const [networkError, setNetworkError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -553,12 +633,22 @@ function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: st
       .then((network) => setHotels(network.hotels))
       .catch(() => {
         // The list is a courtesy; the concierge works without it.
-        if (!controller.signal.aborted) setHotels([]);
+        if (!controller.signal.aborted) {
+          setHotels([]);
+          setNetworkError(true);
+        }
       });
     return () => controller.abort();
   }, []);
 
-  if (hotels !== null && hotels.length === 0) return null;
+  if (hotels !== null && hotels.length === 0) {
+    if (networkError) return (
+      <p className="mt-6 text-sm text-center" style={{ color: "var(--text-secondary)" }}>
+        Couldn&rsquo;t load participating properties right now — just ask and I&rsquo;ll still search live.
+      </p>
+    );
+    return null;
+  }
 
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12" aria-labelledby="properties-title">
@@ -566,14 +656,27 @@ function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: st
         <div>
           <p className="eyebrow">Participating properties</p>
           <h2 id="properties-title" className="font-poppins text-2xl font-semibold mt-1" style={{ color: "var(--text)" }}>
-            One conversation, every K Hotels property
+            One conversation, every participating property
           </h2>
+          <p className="text-[11px] muted mt-1">Sample properties shown for demonstration.</p>
         </div>
         {hotels && <p className="text-sm muted">{hotels.length} hotels searched live</p>}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {hotels === null
-          ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 180, borderRadius: 14 }} />)
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card overflow-hidden" style={{ height: 180, borderRadius: 14, background: "var(--surface)" }}>
+                <div className="px-4 pt-3 pb-4" style={{ background: "linear-gradient(135deg, var(--brand-teal), var(--brand-cyan))", color: "#fff" }}>
+                  <div className="h-4 w-24 rounded mb-3" style={{ background: "rgba(255,255,255,0.3)" }} />
+                  <div className="h-3 w-16 rounded" style={{ background: "rgba(255,255,255,0.3)" }} />
+                </div>
+                <div className="px-4 py-3 space-y-2">
+                  <div className="h-4 w-32 rounded" style={{ background: "var(--border)" }} />
+                  <div className="h-4 w-48 rounded" style={{ background: "var(--border)" }} />
+                  <div className="h-4 w-24 rounded" style={{ background: "var(--border)" }} />
+                </div>
+              </div>
+            ))
           : hotels.map((hotel) => {
               const [from, to] = toneFor(hotel.hotel);
               return (
@@ -697,21 +800,25 @@ function HowItWorks() {
 function LoadingScreen() {
   return (
     <div className="min-h-[100dvh]" style={{ background: "var(--brand-navy)" }} aria-busy="true">
-      <div className="max-w-3xl mx-auto px-6 pt-24 space-y-5">
-        <div className="skeleton" style={{ height: 22, width: 180, opacity: 0.2 }} />
-        <div className="skeleton" style={{ height: 56, width: "80%", opacity: 0.2 }} />
-        <div className="skeleton" style={{ height: 88, opacity: 0.15, borderRadius: 16 }} />
+      <div className="max-w-3xl mx-auto px-6 pt-24 space-y-8">
+        <img src={innpilotMark} alt="" className="mx-auto w-12 h-12" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-24 h-1 rounded-full" style={{ background: "var(--brand-cyan)", opacity: 0.35 }} />
+          <div className="w-32 h-1 rounded-full" style={{ background: "var(--brand-cyan)", opacity: 0.35 }} />
+          <div className="w-48 h-1 rounded-full" style={{ background: "var(--brand-cyan)", opacity: 0.35 }} />
+        </div>
+        <p className="text-sm font-medium" style={{ color: "var(--rail-text)" }}>
+          Preparing your concierge…
+        </p>
       </div>
-      <p className="sr-only">Loading the concierge…</p>
     </div>
   );
 }
 
-function CenteredMessage({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function CenteredMessage({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center px-5" style={{ background: "var(--app-bg)" }}>
       <div className="card p-8 max-w-md w-full text-center space-y-3">
-        <div className="empty-icon mx-auto">{icon}</div>
         <h1 className="font-poppins text-xl font-semibold">{title}</h1>
         {children}
       </div>
@@ -721,12 +828,12 @@ function CenteredMessage({ icon, title, children }: { icon: ReactNode; title: st
 
 function NotFoundScreen() {
   return (
-    <CenteredMessage icon={<SearchX size={22} />} title="We couldn't find this hotel">
+    <CenteredMessage title="We couldn't find this hotel">
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        This link doesn't match a hotel. You can still search every K Hotels property.
+        This link doesn't match a hotel. You can still search every participating property.
       </p>
       <Link to="/" className="btn btn-primary">
-        <AssistantAvatar size={20} /> Search all hotels
+        <AssistantAvatar size={20} /> Search all properties
       </Link>
     </CenteredMessage>
   );
@@ -734,12 +841,12 @@ function NotFoundScreen() {
 
 function LoadErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <CenteredMessage icon={<Sparkles size={22} />} title="The concierge is taking a break">
+    <CenteredMessage title="The concierge is taking a break">
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         {message}
       </p>
       <button type="button" className="btn btn-primary" onClick={onRetry}>
-        Try again
+        Send again
       </button>
     </CenteredMessage>
   );

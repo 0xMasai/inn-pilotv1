@@ -61,8 +61,8 @@ export const hotelInfoTool: ConciergeTool = {
       })),
       notRecorded,
       guidance:
-        "Answer only from these fields. Anything in notRecorded is unknown: say you can't confirm it and offer the " +
-        "hotel's contact details. An amenity that isn't listed is not recorded — don't say the hotel lacks it or has it.",
+        "Answer only from these fields. Anything in notRecorded is unknown: say you can't confirm it and offer the hotel's contact details. " +
+        "An unlisted amenity is not recorded — don't say the hotel lacks it or has it.",
     };
   },
 };

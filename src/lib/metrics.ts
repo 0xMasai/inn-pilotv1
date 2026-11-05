@@ -19,6 +19,7 @@
  *   Expenses      → createdAt (fallback timestamp/date)
  */
 import type { BookingStatus } from "./collections";
+import { COMMISSION_RATE } from "./commission";
 
 // ---------- Raw record shapes (as stored in Firestore) ----------
 
@@ -33,6 +34,8 @@ export interface BookingRecord {
   roomNumber?: unknown;
   guestName?: string;
   roomType?: string;
+  /** "concierge" when the AI concierge created the booking; absent for front-desk bookings. */
+  source?: string;
 }
 
 export interface OrderRecord {
@@ -79,6 +82,14 @@ export interface ExpenseRecord {
 
 export interface RoomRecord {
   status?: string;
+}
+
+/** Minimal per-conversation data, enough for AI ROI metrics without importing the full Conversation type. */
+export interface ConversationBrief {
+  bookingStatus: "none" | "quoted" | "booked";
+  lastMessage: { role: string; at: Date } | null;
+  lastGuestAt: Date | null;
+  createdAt: Date | null;
 }
 
 export interface BarProductRecord {
@@ -242,6 +253,8 @@ export interface MetricsInput {
   expenses: ExpenseRecord[];
   rooms: RoomRecord[];
   barProducts: BarProductRecord[];
+  /** Minimal per-conversation data for AI ROI metrics. */
+  conversations: ConversationBrief[];
 }
 
 export const emptyMetricsInput = (): MetricsInput => ({
@@ -252,6 +265,7 @@ export const emptyMetricsInput = (): MetricsInput => ({
   expenses: [],
   rooms: [],
   barProducts: [],
+  conversations: [],
 });
 
 export interface Metrics {
@@ -284,6 +298,16 @@ export interface Metrics {
     lowCount: number;
     criticalCount: number;
   };
+  /** AI concierge metrics. */
+  aiBookingsCount: number;
+  aiRevenuePaid: number;
+  aiRevenuePending: number;
+  /** Share of conversations that ended in a booking, 0–100. Null when there are no conversations. */
+  inquiryToBookingConversion: number | null;
+  /** Average time from a guest message to the next response, in milliseconds. Null when unmeasurable. */
+  avgResponseTimeMs: number | null;
+  /** Commission owed on AI-sourced paid revenue, at COMMISSION_RATE. Display only — no billing logic. */
+  commissionOwed: number;
 }
 
 export const computeMetrics = (input: MetricsInput, range: DateRange): Metrics => {
@@ -291,6 +315,9 @@ export const computeMetrics = (input: MetricsInput, range: DateRange): Metrics =
   let bookingsCount = 0;
   let pendingCount = 0;
   let pendingAmount = 0;
+  let aiBookingsCount = 0;
+  let aiRevenuePaid = 0;
+  let aiRevenuePending = 0;
 
   for (const b of input.bookings) {
     if (!isRevenueBooking(b)) continue;
@@ -298,9 +325,14 @@ export const computeMetrics = (input: MetricsInput, range: DateRange): Metrics =
     bookingsCount += 1;
     const amount = Number(b.pricePaid) || 0;
     accommodationRevenue += amount;
+    const isAi = b.source === "concierge";
+    if (isAi) aiBookingsCount += 1;
     if ((b.paymentStatus || "").toLowerCase() === "pending") {
       pendingCount += 1;
       pendingAmount += amount;
+      if (isAi) aiRevenuePending += amount;
+    } else if (isAi) {
+      aiRevenuePaid += amount;
     }
   }
 
@@ -356,6 +388,28 @@ export const computeMetrics = (input: MetricsInput, range: DateRange): Metrics =
     else if (status === "Low") lowCount += 1;
   }
 
+  // --- AI metrics from conversations ---
+  const conversationCount = input.conversations.length;
+  const bookedConversations = input.conversations.filter((c) => c.bookingStatus === "booked").length;
+  const inquiryToBookingConversion = conversationCount > 0 ? (bookedConversations / conversationCount) * 100 : null;
+
+  // Average response time: for each guest message, time to the next non-guest message.
+  // Walk each conversation's messages is not possible here (ConversationBrief has only last message),
+  // so we approximate from lastGuestAt → lastMessage when the last message is a response.
+  let responseTimeSum = 0;
+  let responseCount = 0;
+  for (const c of input.conversations) {
+    if (!c.lastGuestAt || !c.lastMessage) continue;
+    // Only count when the last message is a staff/ai response to a guest message.
+    if (c.lastMessage.role === "guest") continue;
+    const responseMs = c.lastMessage.at.getTime() - c.lastGuestAt.getTime();
+    if (responseMs > 0) {
+      responseTimeSum += responseMs;
+      responseCount += 1;
+    }
+  }
+  const avgResponseTimeMs = responseCount > 0 ? responseTimeSum / responseCount : null;
+
   return {
     accommodationRevenue,
     restaurantRevenue,
@@ -378,6 +432,12 @@ export const computeMetrics = (input: MetricsInput, range: DateRange): Metrics =
       rate: totalRooms ? Math.round((occupied / totalRooms) * 100) : null,
     },
     stock: { value: stockValue, lowCount, criticalCount },
+    aiBookingsCount,
+    aiRevenuePaid,
+    aiRevenuePending,
+    inquiryToBookingConversion,
+    avgResponseTimeMs,
+    commissionOwed: Math.round(aiRevenuePaid * COMMISSION_RATE * 100) / 100,
   };
 };
 

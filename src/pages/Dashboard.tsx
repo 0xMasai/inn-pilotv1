@@ -12,14 +12,18 @@ import {
   ArrowRight,
   BedDouble,
   Beer,
+  Bot,
   CircleParking,
+  Clock,
   DoorOpen,
   PackageX,
   Receipt,
   Scale,
+  Target,
   TrendingUp,
   Utensils,
   Wallet,
+  Watch,
 } from "lucide-react";
 import {
   Area,
@@ -34,6 +38,7 @@ import {
 import { useWorkspace } from "../workspace/workspaceContext";
 import { useHotelData } from "../lib/useHotelData";
 import { useHotelProfile } from "../lib/hotelProfile";
+import { COMMISSION_RATE } from "../lib/commission";
 import {
   computeMetrics,
   dailySeries,
@@ -83,6 +88,15 @@ const KIND_STYLE: Record<TransactionKind, { color: string; icon: typeof BedDoubl
 function delta(current: number, previous: number): number | null {
   if (previous === 0) return null;
   return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+/** "2m 30s" / "45s" — average response time from milliseconds. */
+function responseTime(ms: number | null): string {
+  if (ms === null) return "—";
+  const totalSec = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
 export default function Dashboard() {
@@ -239,6 +253,68 @@ export default function Dashboard() {
               ? `${metrics.stock.criticalCount} critical · stock worth ${moneyCompact(metrics.stock.value, currency)}`
               : `Bar stock worth ${moneyCompact(metrics.stock.value, currency)}`
           }
+        />
+      </StatGrid>
+
+      {/* AI CONCIERGE KPIs */}
+      <StatGrid columns={3}>
+        <StatCard
+          index={8}
+          loading={loading}
+          label="AI Bookings"
+          value={num(metrics.aiBookingsCount)}
+          icon={<Bot size={19} />}
+          tone="primary"
+          hint="Created by the AI concierge (source: concierge)"
+        />
+        <StatCard
+          index={9}
+          loading={loading}
+          label="AI Revenue — Paid"
+          value={money(metrics.aiRevenuePaid, currency)}
+          icon={<TrendingUp size={19} />}
+          tone="success"
+          hint="Guest paid at booking"
+        />
+        <StatCard
+          index={10}
+          loading={loading}
+          label="AI Revenue — Pending"
+          value={money(metrics.aiRevenuePending, currency)}
+          icon={<Clock size={19} />}
+          tone="warning"
+          hint="Settled at the hotel on arrival"
+        />
+        <StatCard
+          index={11}
+          loading={loading}
+          label="Inquiry → Booking"
+          value={percent(metrics.inquiryToBookingConversion)}
+          icon={<Target size={19} />}
+          tone="purple"
+          hint={
+            metrics.inquiryToBookingConversion === null
+              ? "No conversations yet"
+              : `${metrics.aiBookingsCount} booked of ${metrics.aiBookingsCount > 0 ? "inquiries" : "inquiries"}`
+          }
+        />
+        <StatCard
+          index={12}
+          loading={loading}
+          label="Avg Response Time"
+          value={responseTime(metrics.avgResponseTimeMs)}
+          icon={<Watch size={19} />}
+          tone="orange"
+          hint="Guest message → AI or staff reply"
+        />
+        <StatCard
+          index={13}
+          loading={loading}
+          label="Commission Owed"
+          value={money(metrics.commissionOwed, currency)}
+          icon={<Receipt size={19} />}
+          tone="danger"
+          hint={`${(COMMISSION_RATE * 100).toFixed(0)}% of AI-sourced paid revenue — display only`}
         />
       </StatGrid>
 

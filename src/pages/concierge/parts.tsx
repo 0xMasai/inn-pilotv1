@@ -25,9 +25,10 @@ import {
   Phone,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
+
+import innpilotMark from "../../assets/brand/innpilot-mark.png";
 
 import { CONFIRM_BOOKING_MESSAGE } from "../../lib/confirmation";
 import { money, plural } from "../../lib/format";
@@ -77,10 +78,10 @@ export function AssistantAvatar({ size = 32 }: { size?: number }) {
   return (
     <span
       className="shrink-0 rounded-full flex items-center justify-center"
-      style={{ width: size, height: size, background: "linear-gradient(135deg, var(--brand-teal), var(--brand-cyan))", color: "#fff" }}
+      style={{ width: size, height: size, background: "linear-gradient(135deg, var(--brand-teal), var(--brand-cyan))" }}
       aria-hidden
     >
-      <Sparkles size={Math.round(size * 0.47)} />
+      <img src={innpilotMark} alt="" className="w-full h-full rounded-full" />
     </span>
   );
 }
@@ -92,7 +93,7 @@ export interface EntryActions {
   onEdit: () => void;
 }
 
-export function MessageBubble({ entry, actions }: { entry: ChatEntry; actions: EntryActions }) {
+export function MessageBubble({ entry, actions, sending }: { entry: ChatEntry; actions: EntryActions; sending: Set<string> }) {
   if (entry.role === "user") {
     return (
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
@@ -103,7 +104,12 @@ export function MessageBubble({ entry, actions }: { entry: ChatEntry; actions: E
           >
             {entry.text}
           </div>
-          {entry.failed && (
+          {sending.has(entry.id) && (
+            <p className="text-xs mt-1 text-right flex items-center justify-end gap-1" style={{ color: "var(--text-secondary)" }}>
+              <RotateCcw size={11} className="animate-spin" /> Sending…
+            </p>
+          )}
+          {entry.failed && !sending.has(entry.id) && (
             <p className="text-xs mt-1 text-right" style={{ color: "var(--danger-text)" }}>
               Not delivered
             </p>
@@ -165,8 +171,7 @@ export function MessageBubble({ entry, actions }: { entry: ChatEntry; actions: E
 
 const WAITING_STEPS = [
   "Understanding your request…",
-  "Searching K Hotels properties…",
-  "Checking live availability and prices…",
+  "Checking availability…",
   "Almost there…",
 ];
 
@@ -220,7 +225,7 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
         <p>{message}</p>
         {onRetry && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
-            <RotateCcw size={14} /> Try again
+            <RotateCcw size={14} /> Send again
           </button>
         )}
       </div>
@@ -542,7 +547,7 @@ export function BookingConfirmedCard({ booking }: { booking: ConciergeBooking })
 
       <div className="px-4 py-3 text-xs space-y-2" style={{ borderTop: "1px solid var(--border)", color: "var(--text-secondary)" }}>
         <p className="inline-flex items-center gap-1.5">
-          <Moon size={13} /> Nothing has been charged. Payment is settled with the hotel.
+          <Moon size={13} /> Total due: {money(booking.totalPrice, booking.currency)}. Payment is settled at {booking.hotelName} on arrival — cash, MTN MoMo, Airtel Money or card.
         </p>
         {(booking.hotelPhone || booking.hotelEmail) && (
           <div className="flex flex-wrap gap-x-4 gap-y-1">

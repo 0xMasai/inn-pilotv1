@@ -180,4 +180,67 @@ describe("the API client", () => {
     expect(error.code).toBe("http_502");
     expect(error.message).toMatch(/can't reach the concierge/);
   });
+
+  it("marks rate-limited, unavailable, timeout and network errors as retryable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Rate limited.", code: "rate_limited" }), { status: 429 }))
+    );
+    await expect(sendConciergeMessage("hi", [])).rejects.toMatchObject({ code: "rate_limited", retryable: true });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Down.", code: "unavailable" }), { status: 503 }))
+    );
+    await expect(sendConciergeMessage("hi", [])).rejects.toMatchObject({ code: "unavailable", retryable: true });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Slow.", code: "timeout" }), { status: 504 }))
+    );
+    await expect(sendConciergeMessage("hi", [])).rejects.toMatchObject({ code: "timeout", retryable: true });
+
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await expect(sendConciergeMessage("hi", [])).rejects.toMatchObject({ code: "network", retryable: true });
+  });
+
+  it("does not mark invalid_request as retryable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Bad request.", code: "invalid_request" }), { status: 400 }))
+    );
+    await expect(sendConciergeMessage("hi", [])).rejects.toMatchObject({ code: "invalid_request", retryable: false });
+  });
+
+  it("propagates retryAttempt from the server response", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ reply: "Hi", model: "m", requestId: "r", retryAttempt: 2 }), { status: 200 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const reply = await sendConciergeMessage("hi", []);
+    expect(reply.retryAttempt).toBe(2);
+  });
+
+  it("uses neutral error wording with no 'try again'", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Rate limited.", code: "rate_limited" }), { status: 429 }))
+    );
+    const error = await sendConciergeMessage("hi", []).catch((e: unknown) => e) as ConciergeError;
+    expect(error.message).not.toMatch(/try again/i);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Slow.", code: "timeout" }), { status: 504 }))
+    );
+    const timeoutError = await sendConciergeMessage("hi", []).catch((e: unknown) => e) as ConciergeError;
+    expect(timeoutError.message).not.toMatch(/try again/i);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "I couldn't send that. Send it again.", code: "unexpected" }), { status: 500 }))
+    );
+    const fallbackError = await sendConciergeMessage("hi", []).catch((e: unknown) => e) as ConciergeError;
+    expect(fallbackError.message).toMatch(/send it again/i);
+  });
 });

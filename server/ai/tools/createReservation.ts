@@ -189,9 +189,9 @@ export const createReservationTool: ConciergeTool = {
   definition: {
     name: "create_reservation",
     description:
-      "Create the real reservation for a booking summary the guest has ALREADY seen (from prepare_booking in an earlier " +
-      "message) and has just explicitly confirmed. Pass exactly the same hotel, room type, dates, name and phone as the " +
-      "summary. It re-checks availability and price itself. If it returns not_booked, nothing was booked.",
+      "Create the real reservation for a booking summary the guest already saw (from prepare_booking in an earlier message) " +
+      "and just explicitly confirmed. Pass exactly the same hotel, room type, dates, name and phone as the summary. " +
+      "It re-checks availability and price itself. If it returns not_booked, nothing was booked.",
     parameters: {
       type: "object",
       properties: {
@@ -278,9 +278,7 @@ export const createReservationTool: ConciergeTool = {
         return {
           status: "confirmed",
           booking,
-          guidance:
-            "The reservation exists. Give the guest the reservation reference, hotel, room type, dates and total, and say " +
-            "payment is settled with the hotel — nothing has been charged.",
+          guidance: `The reservation exists. Give the guest the reservation reference, hotel, room type, dates and total, and say the total due is ${booking.totalPrice} ${booking.currency}, payable at ${booking.hotelName} on arrival — cash, MTN MoMo, Airtel Money or card.`,
         };
       }
       if (result.reason === "price_changed" && typeof result.totalPrice === "number") newTotal = result.totalPrice;

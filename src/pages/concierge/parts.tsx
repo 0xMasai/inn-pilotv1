@@ -547,7 +547,7 @@ export function BookingConfirmedCard({ booking }: { booking: ConciergeBooking })
 
       <div className="px-4 py-3 text-xs space-y-2" style={{ borderTop: "1px solid var(--border)", color: "var(--text-secondary)" }}>
         <p className="inline-flex items-center gap-1.5">
-          <Moon size={13} /> Nothing has been charged. Payment is settled with the hotel.
+          <Moon size={13} /> Total due: {money(booking.totalPrice, booking.currency)}. Payment is settled at {booking.hotelName} on arrival — cash, MTN MoMo, Airtel Money or card.
         </p>
         {(booking.hotelPhone || booking.hotelEmail) && (
           <div className="flex flex-wrap gap-x-4 gap-y-1">

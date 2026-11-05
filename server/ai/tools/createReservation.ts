@@ -278,9 +278,7 @@ export const createReservationTool: ConciergeTool = {
         return {
           status: "confirmed",
           booking,
-          guidance:
-            "The reservation exists. Give the guest the reservation reference, hotel, room type, dates and total, and say " +
-            "payment is settled with the hotel — nothing has been charged.",
+          guidance: `The reservation exists. Give the guest the reservation reference, hotel, room type, dates and total, and say the total due is ${booking.totalPrice} ${booking.currency}, payable at ${booking.hotelName} on arrival — cash, MTN MoMo, Airtel Money or card.`,
         };
       }
       if (result.reason === "price_changed" && typeof result.totalPrice === "number") newTotal = result.totalPrice;

@@ -34,7 +34,6 @@ import {
   MapPin,
   MessageSquarePlus,
   MessagesSquare,
-  SearchX,
   ShieldCheck,
   Sparkles,
   WifiOff,
@@ -125,7 +124,7 @@ function HotelConcierge({ publicHotelId }: { publicHotelId: string }) {
       .then((hotel) => setState({ status: "ready", hotel }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
-        const message = error instanceof Error ? error.message : "Something went wrong.";
+        const message = error instanceof Error ? error.message : "I couldn't load this hotel. Send again.";
         setState(error instanceof ConciergeError && !error.retryable ? { status: "not-found" } : { status: "error", message });
       });
     return () => controller.abort();
@@ -156,6 +155,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
   const [pollError, setPollError] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [checking, setChecking] = useState(false);
+  const [searchDestination, setSearchDestination] = useState<string | null>(null);
   const afterRef = useRef(thread?.after ?? 0);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -249,6 +249,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
       setError(null);
       setPending(true);
       setChecking(true);
+      setSearchDestination(null);
       setSending((current) => new Set([...current, userId]));
 
       try {
@@ -272,6 +273,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             ...(reply.booking ? { booking: reply.booking } : {}),
           },
         ]);
+        setSearchDestination(reply.search?.destination ?? null);
         setChecking(false);
         setSending((current) => { const next = new Set(current); next.delete(userId); return next; });
         setPending(false);
@@ -360,7 +362,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             )}
             {pollError && (
               <div className="rounded-xl px-3 py-2 text-sm flex items-center gap-2" style={{ background: "var(--warning-soft)", color: "var(--warning-text)", border: "1px solid var(--warning-border)" }}>
-                <AlertCircle size={14} /> We're having trouble checking for new replies. Try sending a message.
+                <AlertCircle size={14} /> We're having trouble checking for new replies. Send a message.
               </div>
             )}
             {entries.map((entry) => (
@@ -382,7 +384,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
                     ))}
                   </span>
                   <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    Checking availability…
+                    {searchDestination ? `Checking availability in ${searchDestination}…` : "Checking availability…"}
                   </span>
                 </div>
               </div>
@@ -406,7 +408,7 @@ function Concierge({ hotel }: { hotel?: ConciergeHotel }) {
             )}
             {composer}
             <p className="text-[11px] muted mt-1.5 text-center">
-              Rooms, prices and bookings come live from {hotel ? hotel.name : "K Hotels"}' booking systems.
+              Rooms, prices and bookings come live from {hotel ? hotel.name : "participating hotels"}' booking systems.
             </p>
           </div>
         </main>
@@ -554,7 +556,7 @@ function Home({
               style={{ background: "rgba(45,212,200,0.14)", color: "var(--brand-cyan)", border: "1px solid rgba(45,212,200,0.3)" }}
             >
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--brand-cyan)" }} />
-              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "K Hotels · live rooms and prices"}
+              {hotel ? `${hotel.city ?? "Live"} · live rooms and prices` : "InnPilot · live rooms and prices"}
             </p>
             <h1 className="font-poppins font-semibold text-white mt-5 text-4xl sm:text-6xl leading-[1.05] tracking-tight">
               {hotel ? (
@@ -570,7 +572,7 @@ function Home({
             <p className="mt-4 text-base sm:text-lg max-w-2xl" style={{ color: "var(--rail-text)" }}>
               {hotel
                 ? "Tell me when you'd like to stay. I'll check live availability, show you real prices and book your room in this chat."
-                : "Search available K Hotels with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
+                : "Search available properties with a simple conversation. Say where and when — I'll find real rooms at real prices and book the one you choose."}
             </p>
           </motion.div>
 
@@ -654,14 +656,27 @@ function Properties({ disabled, onSend }: { disabled: boolean; onSend: (text: st
         <div>
           <p className="eyebrow">Participating properties</p>
           <h2 id="properties-title" className="font-poppins text-2xl font-semibold mt-1" style={{ color: "var(--text)" }}>
-            One conversation, every K Hotels property
+            One conversation, every participating property
           </h2>
+          <p className="text-[11px] muted mt-1">Sample properties shown for demonstration.</p>
         </div>
         {hotels && <p className="text-sm muted">{hotels.length} hotels searched live</p>}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {hotels === null
-          ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 180, borderRadius: 14 }} />)
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card overflow-hidden" style={{ height: 180, borderRadius: 14, background: "var(--surface)" }}>
+                <div className="px-4 pt-3 pb-4" style={{ background: "linear-gradient(135deg, var(--brand-teal), var(--brand-cyan))", color: "#fff" }}>
+                  <div className="h-4 w-24 rounded mb-3" style={{ background: "rgba(255,255,255,0.3)" }} />
+                  <div className="h-3 w-16 rounded" style={{ background: "rgba(255,255,255,0.3)" }} />
+                </div>
+                <div className="px-4 py-3 space-y-2">
+                  <div className="h-4 w-32 rounded" style={{ background: "var(--border)" }} />
+                  <div className="h-4 w-48 rounded" style={{ background: "var(--border)" }} />
+                  <div className="h-4 w-24 rounded" style={{ background: "var(--border)" }} />
+                </div>
+              </div>
+            ))
           : hotels.map((hotel) => {
               const [from, to] = toneFor(hotel.hotel);
               return (
@@ -785,21 +800,25 @@ function HowItWorks() {
 function LoadingScreen() {
   return (
     <div className="min-h-[100dvh]" style={{ background: "var(--brand-navy)" }} aria-busy="true">
-      <div className="max-w-3xl mx-auto px-6 pt-24 space-y-5">
-        <div className="skeleton" style={{ height: 22, width: 180, opacity: 0.2 }} />
-        <div className="skeleton" style={{ height: 56, width: "80%", opacity: 0.2 }} />
-        <div className="skeleton" style={{ height: 88, opacity: 0.15, borderRadius: 16 }} />
+      <div className="max-w-3xl mx-auto px-6 pt-24 space-y-8">
+        <img src={innpilotMark} alt="" className="mx-auto w-12 h-12" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-24 h-1 rounded-full" style={{ background: "var(--brand-cyan)", opacity: 0.35 }} />
+          <div className="w-32 h-1 rounded-full" style={{ background: "var(--brand-cyan)", opacity: 0.35 }} />
+          <div className="w-48 h-1 rounded-full" style={{ background: "var(--brand-cyan)", opacity: 0.35 }} />
+        </div>
+        <p className="text-sm font-medium" style={{ color: "var(--rail-text)" }}>
+          Preparing your concierge…
+        </p>
       </div>
-      <p className="sr-only">Loading the concierge…</p>
     </div>
   );
 }
 
-function CenteredMessage({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function CenteredMessage({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex items-center justify-center px-5" style={{ background: "var(--app-bg)" }}>
       <div className="card p-8 max-w-md w-full text-center space-y-3">
-        <div className="empty-icon mx-auto">{icon}</div>
         <h1 className="font-poppins text-xl font-semibold">{title}</h1>
         {children}
       </div>
@@ -809,12 +828,12 @@ function CenteredMessage({ icon, title, children }: { icon: ReactNode; title: st
 
 function NotFoundScreen() {
   return (
-    <CenteredMessage icon={<SearchX size={22} />} title="We couldn't find this hotel">
+    <CenteredMessage title="We couldn't find this hotel">
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        This link doesn't match a hotel. You can still search every K Hotels property.
+        This link doesn't match a hotel. You can still search every participating property.
       </p>
       <Link to="/" className="btn btn-primary">
-        <AssistantAvatar size={20} /> Search all hotels
+        <AssistantAvatar size={20} /> Search all properties
       </Link>
     </CenteredMessage>
   );
@@ -822,12 +841,12 @@ function NotFoundScreen() {
 
 function LoadErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <CenteredMessage icon={<Sparkles size={22} />} title="The concierge is taking a break">
+    <CenteredMessage title="The concierge is taking a break">
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         {message}
       </p>
       <button type="button" className="btn btn-primary" onClick={onRetry}>
-        Try again
+        Send again
       </button>
     </CenteredMessage>
   );

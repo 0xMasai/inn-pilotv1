@@ -25,9 +25,10 @@ import {
   Phone,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
+
+import innpilotMark from "../../assets/brand/innpilot-mark.png";
 
 import { CONFIRM_BOOKING_MESSAGE } from "../../lib/confirmation";
 import { money, plural } from "../../lib/format";
@@ -77,10 +78,10 @@ export function AssistantAvatar({ size = 32 }: { size?: number }) {
   return (
     <span
       className="shrink-0 rounded-full flex items-center justify-center"
-      style={{ width: size, height: size, background: "linear-gradient(135deg, var(--brand-teal), var(--brand-cyan))", color: "#fff" }}
+      style={{ width: size, height: size, background: "linear-gradient(135deg, var(--brand-teal), var(--brand-cyan))" }}
       aria-hidden
     >
-      <Sparkles size={Math.round(size * 0.47)} />
+      <img src={innpilotMark} alt="" className="w-full h-full rounded-full" />
     </span>
   );
 }
@@ -224,7 +225,7 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
         <p>{message}</p>
         {onRetry && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
-            <RotateCcw size={14} /> Try again
+            <RotateCcw size={14} /> Send again
           </button>
         )}
       </div>
